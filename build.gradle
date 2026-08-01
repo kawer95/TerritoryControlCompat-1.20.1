@@ -1,0 +1,31 @@
+plugins {
+    id 'eclipse'
+    id 'idea'
+    id 'net.minecraftforge.gradle' version '6.0.54'
+}
+
+group = 'com.arxyt'
+version = '0.1.0'
+
+base { archivesName = 'territorycontrolcompat' }
+
+java { toolchain.languageVersion = JavaLanguageVersion.of(17) }
+
+minecraft {
+    mappings channel: 'official', version: '1.20.1'
+    copyIdeResources = true
+}
+
+repositories { mavenCentral() }
+
+dependencies {
+    minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
+    implementation fg.deobf(files('../TerritoryControl-1.20.1/build/libs/territorycontrol-0.6.0.jar'))
+}
+
+tasks.named('jar', Jar).configure {
+    manifest.attributes(['MixinConfigs': 'territorycontrolcompat.mixins.json'])
+    finalizedBy 'reobfJar'
+}
+
+tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }

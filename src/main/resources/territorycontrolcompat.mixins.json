@@ -1,0 +1,19 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.arxyt.territorycontrolcompat.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "mixins": [
+    "CaerulaTrailProcedureMixin",
+    "CaerulaExpandTrailProcedureMixin",
+    "CaerulaLayOvaryProcedureMixin",
+    "CaerulaOvaryBlockMixin",
+    "CaerulaAdditionalTrailPlacementMixin",
+    "CaerulaTrailBlockMixin",
+    "PhayriosisExpansionProcedureMixin",
+    "PhayriosisSecondaryExpansionMixin",
+    "PhayrileshMiteExpansionMixin",
+    "PhayriosisSpawnProcedureMixin"
+  ],
+  "injectors": { "defaultRequire": 1 }
+}
