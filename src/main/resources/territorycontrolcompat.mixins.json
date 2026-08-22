@@ -13,7 +13,8 @@
     "PhayriosisExpansionProcedureMixin",
     "PhayriosisSecondaryExpansionMixin",
     "PhayrileshMiteExpansionMixin",
-    "PhayriosisSpawnProcedureMixin"
+    "PhayriosisSpawnProcedureMixin",
+    "GastgaberBuilderStructureMixin"
   ],
   "injectors": { "defaultRequire": 1 }
 }

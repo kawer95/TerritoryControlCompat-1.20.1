@@ -5,7 +5,7 @@ plugins {
 }
 
 group = 'com.arxyt'
-version = '0.2.0'
+version = '0.3.0'
 
 base { archivesName = 'territorycontrolcompat' }
 
@@ -29,3 +29,15 @@ tasks.named('jar', Jar).configure {
 }
 
 tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
+
+tasks.register('verifySporeCompat', JavaExec) {
+    group = 'verification'
+    description = 'Runs the dependency-free Spore infection block classification checks.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.arxyt.territorycontrolcompat.compat.SporeCompatVerification'
+}
+
+tasks.named('check').configure {
+    dependsOn tasks.named('verifySporeCompat')
+}

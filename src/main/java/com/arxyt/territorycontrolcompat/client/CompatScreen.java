@@ -89,6 +89,18 @@ public final class CompatScreen extends Screen {
                 addToggle(contentX, y + ROW_HEIGHT, contentWidth, "解药模式", config::phayriosisCure,
                         value -> config = new CompatSavedData.Config(config.balancedOvaryDensity(), config.restrictCaerula(), config.tideRecession(), config.restrictEyes(), config.eyesCollapse(), config.restrictPhayriosis(), value));
             }
+            case SPORE -> {
+                addToggle(contentX, y, contentWidth, "菌囊仅能在实控区生成", config::restrictSporeMounds,
+                        value -> config = config.withRestrictSporeMounds(value));
+                addToggle(contentX, y + ROW_HEIGHT, contentWidth, "哨戒体仅能在实控区生成", config::restrictSporeVigils,
+                        value -> config = config.withRestrictSporeVigils(value));
+                addToggle(contentX, y + ROW_HEIGHT * 2, contentWidth, "菌染刷怪笼结构仅限实控区", config::restrictSporeSpawnerStructures,
+                        value -> config = config.withRestrictSporeSpawnerStructures(value));
+                addToggle(contentX, y + ROW_HEIGHT * 3, contentWidth, "失去实控权时还原侵蚀", config::restoreSporeOnLoss,
+                        value -> config = config.withRestoreSporeOnLoss(value));
+                addToggle(contentX, y + ROW_HEIGHT * 4, contentWidth, "侵蚀只能向实控区扩散", config::restrictSporeInfectionSpread,
+                        value -> config = config.withRestrictSporeInfectionSpread(value));
+            }
         }
     }
 
@@ -124,7 +136,8 @@ public final class CompatScreen extends Screen {
     private enum Section {
         CAERULA("方块与深蓝之树"),
         EYES("眼魔"),
-        PHAYRIOSIS("法耶病");
+        PHAYRIOSIS("法耶病"),
+        SPORE("真菌感染：孢子");
 
         private final String title;
 
