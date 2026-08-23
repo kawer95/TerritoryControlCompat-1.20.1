@@ -105,5 +105,10 @@ public final class CompatSavedData extends SavedData {
         }
 
         public Config normalized() { return this; }
+
+        public boolean hasPlacementRestrictions() {
+            return restrictCaerula || restrictEyes || restrictPhayriosis
+                    || restrictSporeSpawnerStructures || restrictSporeInfectionSpread;
+        }
     }
 }
