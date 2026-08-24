@@ -64,15 +64,6 @@ public final class SporeCompat {
                 || TerritoryControlApi.isOwnedByModFaction(server, pos, MOD_ID);
     }
 
-    /** Covers FoliageSpread's direct FallingBlockEntity calls, which never place the fungal state at the source. */
-    public static boolean allowFungalInfectionFallingConversion(Level level, BlockPos pos) {
-        if (!(level instanceof ServerLevel server)) {
-            return true;
-        }
-        return !CompatSavedData.get(server).config().restrictSporeInfectionSpread()
-                || TerritoryControlApi.isOwnedByModFaction(server, pos, MOD_ID);
-    }
-
     /** Separately protects the Builder's overgrown-spawner structure without requiring spread containment. */
     public static boolean allowOvergrownSpawnerPlacement(LevelAccessor level, BlockPos pos, BlockState state) {
         if (!(level instanceof ServerLevel server) || !isOvergrownSpawner(state)) {

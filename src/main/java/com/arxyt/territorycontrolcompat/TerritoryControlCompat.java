@@ -29,7 +29,7 @@ public final class TerritoryControlCompat {
         MinecraftForge.EVENT_BUS.register(new SporeEntitySpawnHandler());
         CompatNetwork.register();
         FMLJavaModLoadingContext.get().getModEventBus().addListener(this::commonSetup);
-        DistExecutor.safeRunWhenOn(Dist.CLIENT, () -> () -> com.arxyt.territorycontrolcompat.client.CompatClientEvents.registerPage());
+        DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> com.arxyt.territorycontrolcompat.client.CompatClientEvents::registerPage);
     }
 
     private void commonSetup(FMLCommonSetupEvent event) {
