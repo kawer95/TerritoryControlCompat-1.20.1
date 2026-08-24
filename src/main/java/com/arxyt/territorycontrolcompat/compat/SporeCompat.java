@@ -9,6 +9,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
@@ -57,6 +58,15 @@ public final class SporeCompat {
     /** Blocks infection-tagged placements outside territory only when the visual option is enabled. */
     public static boolean allowFungalInfectionBlockPlacement(LevelAccessor level, BlockPos pos, BlockState state) {
         if (!(level instanceof ServerLevel server) || !isFungalInfectionBlock(state)) {
+            return true;
+        }
+        return !CompatSavedData.get(server).config().restrictSporeInfectionSpread()
+                || TerritoryControlApi.isOwnedByModFaction(server, pos, MOD_ID);
+    }
+
+    /** Covers FoliageSpread's direct FallingBlockEntity calls, which never place the fungal state at the source. */
+    public static boolean allowFungalInfectionFallingConversion(Level level, BlockPos pos) {
+        if (!(level instanceof ServerLevel server)) {
             return true;
         }
         return !CompatSavedData.get(server).config().restrictSporeInfectionSpread()
