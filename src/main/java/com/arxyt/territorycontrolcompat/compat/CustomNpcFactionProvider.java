@@ -10,7 +10,9 @@ import java.lang.reflect.Array;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Optional CNPC bridge. All CNPC references are resolved by name so the compat jar remains
@@ -22,6 +24,11 @@ public final class CustomNpcFactionProvider implements EntityFactionProvider {
     private static final String NPC_CLASS_NAME = "noppes.npcs.entity.EntityNPCInterface";
     private static final String NPC_PACKAGE_PREFIX = "noppes.npcs.entity.";
     private static final Logger LOGGER = LogUtils.getLogger();
+    /** Built-ins verified from FactionController in the target CNPC 20260711 JAR. */
+    private static final List<Option> BUILTIN_FACTIONS = List.of(
+            new Option("0", "Friendly", 0x00DD00),
+            new Option("1", "Neutral", 0xF2DD00),
+            new Option("2", "Aggressive", 0xDD0000));
 
     private final Class<?> npcClass;
     private final Method getFactionMethod;
@@ -129,8 +136,7 @@ public final class CustomNpcFactionProvider implements EntityFactionProvider {
                 int color = colorValue(factionColorMethod.invoke(faction));
                 result.add(new Option(key, name, color));
             }
-            result.sort(Comparator.comparingInt(option -> parseInt(option.key())));
-            return List.copyOf(result);
+            return completeBuiltinFactionCatalog(result);
         } catch (Throwable throwable) {
             disable("CNPC faction directory lookup failed; faction mappings are now disabled", throwable);
             throw new IllegalStateException("CNPC faction directory unavailable", throwable);
@@ -203,6 +209,28 @@ public final class CustomNpcFactionProvider implements EntityFactionProvider {
         } catch (NumberFormatException exception) {
             return Integer.MAX_VALUE;
         }
+    }
+
+    /**
+     * CNPC's runtime catalog normally contains these entries, but some load orders expose an
+     * incomplete API list. Add only the missing built-ins so existing or renamed entries from
+     * CNPC remain authoritative and default IDs always have names in the Territory Control UI.
+     */
+    static List<Option> completeBuiltinFactionCatalog(List<Option> options) {
+        Map<String, Option> byKey = new LinkedHashMap<>();
+        if (options != null) {
+            for (Option option : options) {
+                if (option != null && option.key() != null && !option.key().isBlank()) {
+                    byKey.putIfAbsent(option.key().trim(), option);
+                }
+            }
+        }
+        for (Option builtin : BUILTIN_FACTIONS) {
+            byKey.putIfAbsent(builtin.key(), builtin);
+        }
+        return byKey.values().stream()
+                .sorted(Comparator.comparingInt(option -> parseInt(option.key())))
+                .toList();
     }
 
     private synchronized void disable(String message, Throwable throwable) {
