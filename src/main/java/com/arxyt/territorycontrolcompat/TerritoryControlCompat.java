@@ -7,6 +7,7 @@ import com.arxyt.territorycontrolcompat.compat.PhayriosisCompat;
 import com.arxyt.territorycontrolcompat.compat.SporeCompat;
 import com.arxyt.territorycontrolcompat.compat.SporeEntitySpawnHandler;
 import com.arxyt.territorycontrolcompat.compat.CompatBlockPolicy;
+import com.arxyt.territorycontrolcompat.compat.CustomNpcFactionProvider;
 import com.arxyt.territorycontrolcompat.network.CompatNetwork;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.api.distmarker.Dist;
@@ -14,6 +15,7 @@ import net.minecraftforge.fml.DistExecutor;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
+import net.minecraftforge.fml.ModList;
 
 @Mod(TerritoryControlCompat.MODID)
 public final class TerritoryControlCompat {
@@ -26,6 +28,11 @@ public final class TerritoryControlCompat {
         TerritoryControlApi.registerOwnershipChangeListener(EyesCompat::onOwnershipChanged);
         TerritoryControlApi.registerOwnershipChangeListener(PhayriosisCompat::onOwnershipChanged);
         TerritoryControlApi.registerOwnershipChangeListener(SporeCompat::onOwnershipChanged);
+        if (ModList.get().isLoaded(CustomNpcFactionProvider.MOD_ID)) {
+            // Register even when reflection is unavailable: an applicable CNPC entity must remain
+            // terminally unmapped instead of falling through to the whole customnpcs namespace.
+            TerritoryControlApi.registerEntityFactionProvider(new CustomNpcFactionProvider());
+        }
         MinecraftForge.EVENT_BUS.register(new SporeEntitySpawnHandler());
         CompatNetwork.register();
         FMLJavaModLoadingContext.get().getModEventBus().addListener(this::commonSetup);
