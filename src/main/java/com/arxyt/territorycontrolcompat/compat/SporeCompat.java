@@ -56,7 +56,7 @@ public final class SporeCompat {
             "hive_spawn", "biomass_bulb", "bile_lump", "fang_lump", "exploding_lump", "fungal_clamp",
             "drowned_lump", "poisoning_lump", "glowshroom", "hand", "vocals", "lungs", "acidic_sack",
             "outpost_watcher", "organite", "wall_remains", "frozen_remains", "rooted_mycelium",
-            "mycelium_block", "mycelium_slab");
+            "mycelium_block", "mycelium_slab", "bile", "crusted_bile");
 
     /**
      * Outputs of FoliageSpread's extra placers, death residue, casing generation, and the
@@ -76,7 +76,8 @@ public final class SporeCompat {
             "rooted_biomass", "biomass_block", "sicken_biomass_block", "calcified_biomass_block",
             "gastric_biomass_block", "fungal_shell", "membrane_block",
             "rotten_log", "rotten_planks", "rotten_stair", "rotten_slab", "rotten_scraps",
-            "rotten_branch", "rotten_crops", "rotten_bush", "overgrown_spawner");
+            "rotten_branch", "rotten_crops", "rotten_bush", "overgrown_spawner",
+            "bile", "crusted_bile");
 
     private SporeCompat() {
     }

@@ -19,6 +19,10 @@ public final class SporeCompatVerification {
                 "sculk conversion output must be restricted and cleaned");
         require(SporeCompat.isFungalInfectionBlockId(ResourceLocation.fromNamespaceAndPath("minecraft", "mycelium")),
                 "Spore's grass-to-mycelium conversion must be restricted and cleaned");
+        require(SporeCompat.isFungalInfectionBlockId(ResourceLocation.fromNamespaceAndPath("spore", "bile")),
+                "casing-generated bile must be restricted and cleaned");
+        require(SporeCompat.isFungalInfectionBlockId(ResourceLocation.fromNamespaceAndPath("spore", "crusted_bile")),
+                "solidified bile must remain restricted and cleaned");
         require(!SporeCompat.isFungalInfectionBlockId(ResourceLocation.fromNamespaceAndPath("spore", "cdu")),
                 "non-infection Spore machinery must not be cleaned on a territory loss");
         require(!SporeCompat.isFungalInfectionBlockId(ResourceLocation.fromNamespaceAndPath("minecraft", "stone")),
@@ -40,6 +44,10 @@ public final class SporeCompatVerification {
                 "frozen remains must be removed as air");
         require(SporeCompat.isAirCleanupBlockId(ResourceLocation.fromNamespaceAndPath("spore", "mycelium_block")),
                 "casing fungal stalks must be removed as air");
+        require(SporeCompat.isAirCleanupBlockId(ResourceLocation.fromNamespaceAndPath("spore", "bile")),
+                "generated bile must be removed as air");
+        require(SporeCompat.isAirCleanupBlockId(ResourceLocation.fromNamespaceAndPath("spore", "crusted_bile")),
+                "solidified bile must be removed as air");
         require(!SporeCompat.isAirCleanupBlockId(ResourceLocation.fromNamespaceAndPath("spore", "infested_stone")),
                 "direct stone conversion must remain a reversible conversion");
         require(!SporeCompat.isAirCleanupBlockId(ResourceLocation.fromNamespaceAndPath("spore", "rotten_grass")),
