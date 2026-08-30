@@ -33,7 +33,12 @@ public final class SporeCompat {
     private static final String MYCELIUM_PATH = "mycelium";
     private static final String OVERGROWN_SPAWNER_PATH = "overgrown_spawner";
 
-    /** Union of Spore 2.2.0j's fungal_blocks and foliage-emission block tags. */
+    /**
+     * Blocks which can be emitted by Spore infection, foliage spread, corpses, casings, or
+     * infection structures.  This list is intentionally broader than the fungal_blocks tag:
+     * the source also places several blocks through removable_foliage and block_st without
+     * adding them to fungal_blocks.
+     */
     private static final Set<String> FUNGAL_BLOCK_PATHS = Set.of(
             "remains", "rooted_biomass", "biomass_block", "sicken_biomass_block",
             "calcified_biomass_block", "gastric_biomass_block", "fungal_shell", "membrane_block",
@@ -50,7 +55,28 @@ public final class SporeCompat {
             "hanging_fungal_stem", "mycelium_veins", "fungal_stem", "fungal_stem_top", "biomass_lump",
             "hive_spawn", "biomass_bulb", "bile_lump", "fang_lump", "exploding_lump", "fungal_clamp",
             "drowned_lump", "poisoning_lump", "glowshroom", "hand", "vocals", "lungs", "acidic_sack",
-            "outpost_watcher", "organite", "wall_remains");
+            "outpost_watcher", "organite", "wall_remains", "frozen_remains", "rooted_mycelium",
+            "mycelium_block", "mycelium_slab");
+
+    /**
+     * Outputs of FoliageSpread's extra placers, death residue, casing generation, and the
+     * rotten-wood path.  They do not contain enough information to reconstruct the displaced
+     * or newly occupied block, so losing Spore control removes them instead of inventing stone.
+     */
+    private static final Set<String> AIR_CLEANUP_PATHS = Set.of(
+            "remains", "wall_remains", "frozen_remains",
+            "growths_big", "growths_small", "blomfung", "bloomfung2", "growth_mycelium",
+            "fungal_stem_sapling", "fungal_roots", "underwater_fungal_stem",
+            "underwater_fungal_stem_top", "wall_growths", "wall_growths_big", "wall_growths_fleshy",
+            "hanging_fungal_stem", "mycelium_veins", "fungal_stem", "fungal_stem_top",
+            "mycelium_block", "mycelium_slab", "biomass_lump", "hive_spawn", "biomass_bulb",
+            "bile_lump", "fang_lump", "exploding_lump", "fungal_clamp", "drowned_lump",
+            "poisoning_lump", "glowshroom", "hand", "vocals", "lungs", "acidic_sack",
+            "outpost_watcher", "organite", "brain_remnants",
+            "rooted_biomass", "biomass_block", "sicken_biomass_block", "calcified_biomass_block",
+            "gastric_biomass_block", "fungal_shell", "membrane_block",
+            "rotten_log", "rotten_planks", "rotten_stair", "rotten_slab", "rotten_scraps",
+            "rotten_branch", "rotten_crops", "rotten_bush", "overgrown_spawner");
 
     private SporeCompat() {
     }
@@ -154,10 +180,17 @@ public final class SporeCompat {
         });
     }
 
-    /** Mirrors Spore's default cleaning mappings; ambiguous foliage intentionally falls back to cobblestone. */
+    /**
+     * Describes what the source block can be recovered to after Spore control is lost.  The
+     * source's direct block-infection table is reversible for these fixed targets; foliage and
+     * displaced wood are deliberately handled as air above.
+     */
     private static BlockState restorationFor(ResourceLocation id) {
         if (VANILLA_NAMESPACE.equals(id.getNamespace()) && MYCELIUM_PATH.equals(id.getPath())) {
             return Blocks.DIRT.defaultBlockState();
+        }
+        if (isAirCleanupBlockId(id)) {
+            return Blocks.AIR.defaultBlockState();
         }
         return switch (id.getPath()) {
             case "infested_stone" -> Blocks.STONE.defaultBlockState();
@@ -174,9 +207,23 @@ public final class SporeCompat {
             case "infested_cobbled_deepslate" -> Blocks.COBBLED_DEEPSLATE.defaultBlockState();
             case "infested_stone_bricks" -> Blocks.STONE_BRICKS.defaultBlockState();
             case "infested_bricks" -> Blocks.BRICKS.defaultBlockState();
+            case "infested_laboratory_block" -> sporeBlockState("lab_block");
+            case "infested_laboratory_block1" -> sporeBlockState("lab_block1");
+            case "infested_laboratory_block2" -> sporeBlockState("lab_block2");
+            case "infested_laboratory_block3" -> sporeBlockState("lab_block3");
+            case "rooted_mycelium" -> Blocks.SCULK.defaultBlockState();
             case "rotten_grass" -> Blocks.GRASS.defaultBlockState();
             case "rotten_fern" -> Blocks.FERN.defaultBlockState();
-            default -> Blocks.COBBLESTONE.defaultBlockState();
+            default -> Blocks.AIR.defaultBlockState();
         };
+    }
+
+    static boolean isAirCleanupBlockId(ResourceLocation id) {
+        return MOD_ID.equals(id.getNamespace()) && AIR_CLEANUP_PATHS.contains(id.getPath());
+    }
+
+    private static BlockState sporeBlockState(String path) {
+        Block block = ForgeRegistries.BLOCKS.getValue(new ResourceLocation(MOD_ID, path));
+        return block == null ? Blocks.AIR.defaultBlockState() : block.defaultBlockState();
     }
 }

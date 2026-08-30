@@ -15,13 +15,35 @@ public final class SporeCompatVerification {
                 "infested stone must be restricted and cleaned");
         require(SporeCompat.isFungalInfectionBlockId(ResourceLocation.fromNamespaceAndPath("spore", "growths_big")),
                 "fungal foliage must be restricted and cleaned");
+        require(SporeCompat.isFungalInfectionBlockId(ResourceLocation.fromNamespaceAndPath("spore", "rooted_mycelium")),
+                "sculk conversion output must be restricted and cleaned");
         require(SporeCompat.isFungalInfectionBlockId(ResourceLocation.fromNamespaceAndPath("minecraft", "mycelium")),
                 "Spore's grass-to-mycelium conversion must be restricted and cleaned");
         require(!SporeCompat.isFungalInfectionBlockId(ResourceLocation.fromNamespaceAndPath("spore", "cdu")),
                 "non-infection Spore machinery must not be cleaned on a territory loss");
         require(!SporeCompat.isFungalInfectionBlockId(ResourceLocation.fromNamespaceAndPath("minecraft", "stone")),
                 "ordinary vanilla terrain must not be treated as fungal");
+        verifySporeCleanupClassification();
         verifyBuiltinCnpcFactionCatalog();
+    }
+
+    private static void verifySporeCleanupClassification() {
+        require(SporeCompat.isAirCleanupBlockId(ResourceLocation.fromNamespaceAndPath("spore", "growths_big")),
+                "newly grown ground foliage must be removed as air");
+        require(SporeCompat.isAirCleanupBlockId(ResourceLocation.fromNamespaceAndPath("spore", "wall_remains")),
+                "wall remains must be removed as air");
+        require(SporeCompat.isAirCleanupBlockId(ResourceLocation.fromNamespaceAndPath("spore", "rotten_log")),
+                "displaced rotten wood must be removed as air");
+        require(SporeCompat.isAirCleanupBlockId(ResourceLocation.fromNamespaceAndPath("spore", "rotten_scraps")),
+                "rotten door and fence scraps must be removed as air");
+        require(SporeCompat.isAirCleanupBlockId(ResourceLocation.fromNamespaceAndPath("spore", "frozen_remains")),
+                "frozen remains must be removed as air");
+        require(SporeCompat.isAirCleanupBlockId(ResourceLocation.fromNamespaceAndPath("spore", "mycelium_block")),
+                "casing fungal stalks must be removed as air");
+        require(!SporeCompat.isAirCleanupBlockId(ResourceLocation.fromNamespaceAndPath("spore", "infested_stone")),
+                "direct stone conversion must remain a reversible conversion");
+        require(!SporeCompat.isAirCleanupBlockId(ResourceLocation.fromNamespaceAndPath("spore", "rotten_grass")),
+                "known grass conversion must retain its explicit restoration");
     }
 
     private static void verifyBuiltinCnpcFactionCatalog() {
