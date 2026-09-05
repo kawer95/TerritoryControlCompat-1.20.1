@@ -29,7 +29,18 @@ public final class SporeCompatVerification {
                 "ordinary vanilla terrain must not be treated as fungal");
         verifySporeCleanupClassification();
         verifySporeOrganoidClassification();
+        verifyPhayriosisInsectClassification();
         verifyBuiltinCnpcFactionCatalog();
+    }
+
+    private static void verifyPhayriosisInsectClassification() {
+        List.of("phayrectix", "phayrilesh_mite", "assimilated_mite", "alterack_mite", "siege_mite")
+                .forEach(path -> require(PhayriosisCompat.isSmallInsectId(
+                                ResourceLocation.fromNamespaceAndPath("phayriosis", path)),
+                        path + " must be recognized as a Phayriosis insect"));
+        require(!PhayriosisCompat.isSmallInsectId(
+                        ResourceLocation.fromNamespaceAndPath("phayriosis", "primitive_dreadmind")),
+                "ordinary Phayriosis units must not be filtered by the ambient insect guard");
     }
 
     private static void verifySporeOrganoidClassification() {

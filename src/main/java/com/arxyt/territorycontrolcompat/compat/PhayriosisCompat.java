@@ -7,6 +7,7 @@ import com.arxyt.territorycontrolcompat.data.CompatSavedData;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.block.Block;
@@ -18,6 +19,8 @@ import java.util.Set;
 public final class PhayriosisCompat {
     public static final String MOD_ID = "phayriosis";
     private static final Set<String> REPLACEMENT = Set.of("primitive_phayrilesh", "dormant_primitive_phayrilesh", "fertile_primitive_pharilesh", "sappy_phayrilesh", "putridphayrilesh", "primitive_pharium", "dormant_primitive_pharium", "dontfloatpharium", "sappyphayrium", "putridphayrium", "primitive_phayrossen", "dormant_primitive_phayrossen", "packed_primitive_phayrossen", "dormant_packed_phayrossen", "unstablephayrossen", "primitive_infected_coal_ore", "primitive_infected_copper_ore", "primitive_infected_diamond_ore", "primitive_infected_emerald_ore", "primitive_infected_gold_ore", "primitive_infected_iron_ore", "primitive_infected_lapis_lazuli_ore", "primitive_infected_redstone_ore", "assimilated_log", "assimilated_planks", "assimlated_ice", "assimlatedwood_planks", "contaminated_soil", "witherack", "tough_witherack", "molten_witherack", "seared_withering_nylium", "distorted_altered_nylium", "alterrack_tiles", "activealterracktiles", "soul_alterrack", "basalum", "infested_basalum", "gloomium", "pitchium");
+    private static final Set<String> SMALL_INSECTS = Set.of(
+            "phayrectix", "phayrilesh_mite", "assimilated_mite", "alterack_mite", "siege_mite");
     private static final ThreadLocal<Integer> DEPTH = ThreadLocal.withInitial(() -> 0);
     private PhayriosisCompat() {}
     public static boolean allowBlockPlacement(LevelAccessor l, BlockPos p, BlockState s) { return !(l instanceof ServerLevel server) || !isPhayriosisBlock(s) || !CompatSavedData.get(server).config().restrictPhayriosis() || TerritoryControlApi.isOwnedByModFaction(server, p, MOD_ID); }
@@ -26,6 +29,8 @@ public final class PhayriosisCompat {
     public static void beginExpansion() { DEPTH.set(DEPTH.get() + 1); }
     public static void endExpansion() { int n = DEPTH.get() - 1; if (n <= 0) DEPTH.remove(); else DEPTH.set(n); }
     public static boolean isPhayriosisBlock(BlockState s) { ResourceLocation id = ForgeRegistries.BLOCKS.getKey(s.getBlock()); return id != null && MOD_ID.equals(id.getNamespace()); }
+    public static boolean isSmallInsect(EntityType<?> type) { return isSmallInsectId(ForgeRegistries.ENTITY_TYPES.getKey(type)); }
+    static boolean isSmallInsectId(ResourceLocation id) { return id != null && MOD_ID.equals(id.getNamespace()) && SMALL_INSECTS.contains(id.getPath()); }
     public static void onOwnershipChanged(ServerLevel level, ChunkPos chunk, Faction previous, Faction current) {
         if (previous == null || current == null || !previous.ownsMod(MOD_ID) || !CompatSavedData.get(level).config().phayriosisCure() || !level.hasChunk(chunk.x, chunk.z)) return;
         TerritorySavedData data = TerritorySavedData.get(level);
