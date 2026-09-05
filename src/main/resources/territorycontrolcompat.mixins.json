@@ -14,7 +14,8 @@
     "PhayriosisSecondaryExpansionMixin",
     "PhayrileshMiteExpansionMixin",
     "PhayriosisSpawnProcedureMixin",
-    "GastgaberBuilderStructureMixin"
+    "GastgaberBuilderStructureMixin",
+    "SporeScentSummonMixin"
   ],
   "injectors": { "defaultRequire": 1 }
 }

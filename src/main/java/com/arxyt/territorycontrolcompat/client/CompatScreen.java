@@ -90,7 +90,7 @@ public final class CompatScreen extends Screen {
                         value -> config = new CompatSavedData.Config(config.balancedOvaryDensity(), config.restrictCaerula(), config.tideRecession(), config.restrictEyes(), config.eyesCollapse(), config.restrictPhayriosis(), value));
             }
             case SPORE -> {
-                addToggle(contentX, y, contentWidth, "菌囊仅能在实控区生成", config::restrictSporeMounds,
+                addToggle(contentX, y, contentWidth, "类器官仅能在实控区生成", config::restrictSporeMounds,
                         value -> config = config.withRestrictSporeMounds(value));
                 addToggle(contentX, y + ROW_HEIGHT, contentWidth, "哨戒体仅能在实控区生成", config::restrictSporeVigils,
                         value -> config = config.withRestrictSporeVigils(value));

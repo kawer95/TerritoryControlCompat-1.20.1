@@ -2,7 +2,6 @@ package com.arxyt.territorycontrolcompat.compat;
 
 import com.arxyt.territorycontrol.api.EntityFactionProvider;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.entity.MobSpawnType;
 
 import java.util.List;
 
@@ -29,21 +28,22 @@ public final class SporeCompatVerification {
         require(!SporeCompat.isFungalInfectionBlockId(ResourceLocation.fromNamespaceAndPath("minecraft", "stone")),
                 "ordinary vanilla terrain must not be treated as fungal");
         verifySporeCleanupClassification();
+        verifySporeOrganoidClassification();
         verifyBuiltinCnpcFactionCatalog();
-        verifyPhayriosisAutomaticSpawnClassification();
     }
 
-    private static void verifyPhayriosisAutomaticSpawnClassification() {
-        ResourceLocation phayrectix = ResourceLocation.fromNamespaceAndPath("phayriosis", "phayrectix");
-        require(PhayriosisEntitySpawnHandler.isRestrictedAutomaticSpawn(phayrectix, MobSpawnType.MOB_SUMMONED),
-                "procedure-summoned Phayriosis insects must be territory restricted");
-        require(!PhayriosisEntitySpawnHandler.isRestrictedAutomaticSpawn(phayrectix, MobSpawnType.SPAWN_EGG),
-                "spawn eggs must remain available to hosts during layout");
-        require(!PhayriosisEntitySpawnHandler.isRestrictedAutomaticSpawn(phayrectix, MobSpawnType.COMMAND),
-                "command summons must remain available to hosts");
-        require(!PhayriosisEntitySpawnHandler.isRestrictedAutomaticSpawn(
-                        ResourceLocation.fromNamespaceAndPath("minecraft", "silverfish"), MobSpawnType.MOB_SUMMONED),
-                "other mods' summoned entities must not be intercepted");
+    private static void verifySporeOrganoidClassification() {
+        List.of("mound", "delusioner", "umarmed", "braurei", "tentacle", "arena_tendril",
+                        "gastgaber", "reconstructor", "verva", "usurper", "proto", "hivetumor")
+                .forEach(path -> require(SporeCompat.isTerritoryBoundOrganoidId(
+                                ResourceLocation.fromNamespaceAndPath("spore", path)),
+                        path + " must be covered by the broad organoid restriction"));
+        require(!SporeCompat.isTerritoryBoundOrganoidId(ResourceLocation.fromNamespaceAndPath("spore", "vigil")),
+                "vigils must remain exempt from the broad organoid restriction");
+        require(!SporeCompat.isTerritoryBoundOrganoidId(ResourceLocation.fromNamespaceAndPath("spore", "scent")),
+                "scent must remain exempt from the broad organoid restriction");
+        require(!SporeCompat.isTerritoryBoundOrganoidId(ResourceLocation.fromNamespaceAndPath("spore", "inf_human")),
+                "ordinary infected units must not be mistaken for organoids");
     }
 
     private static void verifySporeCleanupClassification() {

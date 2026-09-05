@@ -8,6 +8,7 @@ import com.arxyt.territorycontrolcompat.data.CompatSavedData;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelAccessor;
@@ -32,6 +33,10 @@ public final class SporeCompat {
     private static final String VANILLA_NAMESPACE = "minecraft";
     private static final String MYCELIUM_PATH = "mycelium";
     private static final String OVERGROWN_SPAWNER_PATH = "overgrown_spawner";
+    private static final Set<String> TERRITORY_BOUND_ORGANOID_PATHS = Set.of(
+            "mound", "delusioner", "umarmed", "braurei", "tentacle", "arena_tendril",
+            "gastgaber", "reconstructor", "verva", "usurper", "proto", "hivetumor");
+    private static final ThreadLocal<Integer> SCENT_SUMMON_DEPTH = ThreadLocal.withInitial(() -> 0);
 
     /**
      * Blocks which can be emitted by Spore infection, foliage spread, corpses, casings, or
@@ -101,6 +106,10 @@ public final class SporeCompat {
     }
 
     public static boolean allowMoundSpawn(ServerLevel level, BlockPos pos) {
+        return allowOrganoidSpawn(level, pos);
+    }
+
+    public static boolean allowOrganoidSpawn(ServerLevel level, BlockPos pos) {
         return !CompatSavedData.get(level).config().restrictSporeMounds()
                 || TerritoryControlApi.isOwnedByModFaction(level, pos, MOD_ID);
     }
@@ -108,6 +117,30 @@ public final class SporeCompat {
     public static boolean allowVigilSpawn(ServerLevel level, BlockPos pos) {
         return !CompatSavedData.get(level).config().restrictSporeVigils()
                 || TerritoryControlApi.isOwnedByModFaction(level, pos, MOD_ID);
+    }
+
+    static boolean isTerritoryBoundOrganoidId(ResourceLocation id) {
+        return id != null && MOD_ID.equals(id.getNamespace())
+                && TERRITORY_BOUND_ORGANOID_PATHS.contains(id.getPath());
+    }
+
+    static boolean isScentSummonInProgress() {
+        return SCENT_SUMMON_DEPTH.get() > 0;
+    }
+
+    /** Keeps Scent's configurable skill summons exempt without exempting unrelated joins. */
+    public static boolean addScentSummonedEntity(Level level, Entity entity) {
+        SCENT_SUMMON_DEPTH.set(SCENT_SUMMON_DEPTH.get() + 1);
+        try {
+            return level.addFreshEntity(entity);
+        } finally {
+            int depth = SCENT_SUMMON_DEPTH.get() - 1;
+            if (depth <= 0) {
+                SCENT_SUMMON_DEPTH.remove();
+            } else {
+                SCENT_SUMMON_DEPTH.set(depth);
+            }
+        }
     }
 
     /** Called by the optional Builder mixin before its complete template is placed. */

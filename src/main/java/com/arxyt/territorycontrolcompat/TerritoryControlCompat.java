@@ -4,7 +4,6 @@ import com.arxyt.territorycontrol.api.TerritoryControlApi;
 import com.arxyt.territorycontrolcompat.compat.CaerulaArborCompat;
 import com.arxyt.territorycontrolcompat.compat.EyesCompat;
 import com.arxyt.territorycontrolcompat.compat.PhayriosisCompat;
-import com.arxyt.territorycontrolcompat.compat.PhayriosisEntitySpawnHandler;
 import com.arxyt.territorycontrolcompat.compat.SporeCompat;
 import com.arxyt.territorycontrolcompat.compat.SporeEntitySpawnHandler;
 import com.arxyt.territorycontrolcompat.compat.CompatBlockPolicy;
@@ -35,7 +34,6 @@ public final class TerritoryControlCompat {
             TerritoryControlApi.registerEntityFactionProvider(new CustomNpcFactionProvider());
         }
         MinecraftForge.EVENT_BUS.register(new SporeEntitySpawnHandler());
-        MinecraftForge.EVENT_BUS.register(new PhayriosisEntitySpawnHandler());
         CompatNetwork.register();
         FMLJavaModLoadingContext.get().getModEventBus().addListener(this::commonSetup);
         DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> com.arxyt.territorycontrolcompat.client.CompatClientEvents::registerPage);

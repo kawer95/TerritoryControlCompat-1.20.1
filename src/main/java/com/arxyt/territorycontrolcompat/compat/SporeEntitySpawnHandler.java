@@ -16,7 +16,9 @@ import net.minecraftforge.registries.ForgeRegistries;
 public final class SporeEntitySpawnHandler {
     @SubscribeEvent
     public void onEntityJoin(EntityJoinLevelEvent event) {
-        if (event.isCanceled() || !(event.getLevel() instanceof ServerLevel level)) {
+        if (event.isCanceled() || event.loadedFromDisk()
+                || SporeCompat.isScentSummonInProgress()
+                || !(event.getLevel() instanceof ServerLevel level)) {
             return;
         }
 
@@ -26,7 +28,8 @@ public final class SporeEntitySpawnHandler {
         }
 
         BlockPos spawnPos = event.getEntity().blockPosition();
-        if ("mound".equals(entityId.getPath()) && !SporeCompat.allowMoundSpawn(level, spawnPos)) {
+        if (SporeCompat.isTerritoryBoundOrganoidId(entityId)
+                && !SporeCompat.allowOrganoidSpawn(level, spawnPos)) {
             event.setCanceled(true);
         } else if ("vigil".equals(entityId.getPath()) && !SporeCompat.allowVigilSpawn(level, spawnPos)) {
             event.setCanceled(true);
