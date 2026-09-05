@@ -2,6 +2,7 @@ package com.arxyt.territorycontrolcompat.compat;
 
 import com.arxyt.territorycontrol.api.EntityFactionProvider;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.MobSpawnType;
 
 import java.util.List;
 
@@ -29,6 +30,20 @@ public final class SporeCompatVerification {
                 "ordinary vanilla terrain must not be treated as fungal");
         verifySporeCleanupClassification();
         verifyBuiltinCnpcFactionCatalog();
+        verifyPhayriosisAutomaticSpawnClassification();
+    }
+
+    private static void verifyPhayriosisAutomaticSpawnClassification() {
+        ResourceLocation phayrectix = ResourceLocation.fromNamespaceAndPath("phayriosis", "phayrectix");
+        require(PhayriosisEntitySpawnHandler.isRestrictedAutomaticSpawn(phayrectix, MobSpawnType.MOB_SUMMONED),
+                "procedure-summoned Phayriosis insects must be territory restricted");
+        require(!PhayriosisEntitySpawnHandler.isRestrictedAutomaticSpawn(phayrectix, MobSpawnType.SPAWN_EGG),
+                "spawn eggs must remain available to hosts during layout");
+        require(!PhayriosisEntitySpawnHandler.isRestrictedAutomaticSpawn(phayrectix, MobSpawnType.COMMAND),
+                "command summons must remain available to hosts");
+        require(!PhayriosisEntitySpawnHandler.isRestrictedAutomaticSpawn(
+                        ResourceLocation.fromNamespaceAndPath("minecraft", "silverfish"), MobSpawnType.MOB_SUMMONED),
+                "other mods' summoned entities must not be intercepted");
     }
 
     private static void verifySporeCleanupClassification() {
