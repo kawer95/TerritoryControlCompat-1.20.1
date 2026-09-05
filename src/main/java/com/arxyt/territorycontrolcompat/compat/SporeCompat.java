@@ -119,6 +119,15 @@ public final class SporeCompat {
                 || TerritoryControlApi.isOwnedByModFaction(level, pos, MOD_ID);
     }
 
+    /** Removes only Proto's low-altitude terrain override; water and air selection remain untouched. */
+    public static int adjustUndergroundCalamityThreshold(Level level, int originalThreshold) {
+        if (!(level instanceof ServerLevel server)
+                || !CompatSavedData.get(server).config().disableSporeUndergroundBias()) {
+            return originalThreshold;
+        }
+        return server.getMinBuildHeight();
+    }
+
     static boolean isTerritoryBoundOrganoidId(ResourceLocation id) {
         return id != null && MOD_ID.equals(id.getNamespace())
                 && TERRITORY_BOUND_ORGANOID_PATHS.contains(id.getPath());

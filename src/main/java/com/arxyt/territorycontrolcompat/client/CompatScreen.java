@@ -71,23 +71,23 @@ public final class CompatScreen extends Screen {
         switch (selected) {
             case CAERULA -> {
                 addToggle(contentX, y, contentWidth, "平衡育生池密度", config::balancedOvaryDensity,
-                        value -> config = new CompatSavedData.Config(value, config.restrictCaerula(), config.tideRecession(), config.restrictEyes(), config.eyesCollapse(), config.restrictPhayriosis(), config.phayriosisCure()));
+                        value -> config = config.withBalancedOvaryDensity(value));
                 addToggle(contentX, y + ROW_HEIGHT, contentWidth, "只能在占领区扩散", config::restrictCaerula,
-                        value -> config = new CompatSavedData.Config(config.balancedOvaryDensity(), value, config.tideRecession(), config.restrictEyes(), config.eyesCollapse(), config.restrictPhayriosis(), config.phayriosisCure()));
+                        value -> config = config.withRestrictCaerula(value));
                 addToggle(contentX, y + ROW_HEIGHT * 2, contentWidth, "退潮模式", config::tideRecession,
-                        value -> config = new CompatSavedData.Config(config.balancedOvaryDensity(), config.restrictCaerula(), value, config.restrictEyes(), config.eyesCollapse(), config.restrictPhayriosis(), config.phayriosisCure()));
+                        value -> config = config.withTideRecession(value));
             }
             case EYES -> {
                 addToggle(contentX, y, contentWidth, "只能在占领区扩散", config::restrictEyes,
-                        value -> config = new CompatSavedData.Config(config.balancedOvaryDensity(), config.restrictCaerula(), config.tideRecession(), value, config.eyesCollapse(), config.restrictPhayriosis(), config.phayriosisCure()));
+                        value -> config = config.withRestrictEyes(value));
                 addToggle(contentX, y + ROW_HEIGHT, contentWidth, "崩塌模式", config::eyesCollapse,
-                        value -> config = new CompatSavedData.Config(config.balancedOvaryDensity(), config.restrictCaerula(), config.tideRecession(), config.restrictEyes(), value, config.restrictPhayriosis(), config.phayriosisCure()));
+                        value -> config = config.withEyesCollapse(value));
             }
             case PHAYRIOSIS -> {
                 addToggle(contentX, y, contentWidth, "只能在占领区扩散", config::restrictPhayriosis,
-                        value -> config = new CompatSavedData.Config(config.balancedOvaryDensity(), config.restrictCaerula(), config.tideRecession(), config.restrictEyes(), config.eyesCollapse(), value, config.phayriosisCure()));
+                        value -> config = config.withRestrictPhayriosis(value));
                 addToggle(contentX, y + ROW_HEIGHT, contentWidth, "解药模式", config::phayriosisCure,
-                        value -> config = new CompatSavedData.Config(config.balancedOvaryDensity(), config.restrictCaerula(), config.tideRecession(), config.restrictEyes(), config.eyesCollapse(), config.restrictPhayriosis(), value));
+                        value -> config = config.withPhayriosisCure(value));
             }
             case SPORE -> {
                 addToggle(contentX, y, contentWidth, "类器官仅能在实控区生成", config::restrictSporeMounds,
@@ -100,6 +100,8 @@ public final class CompatScreen extends Screen {
                         value -> config = config.withRestoreSporeOnLoss(value));
                 addToggle(contentX, y + ROW_HEIGHT * 4, contentWidth, "侵蚀只能向实控区扩散", config::restrictSporeInfectionSpread,
                         value -> config = config.withRestrictSporeInfectionSpread(value));
+                addToggle(contentX, y + ROW_HEIGHT * 5, contentWidth, "取消地下掘食者偏置", config::disableSporeUndergroundBias,
+                        value -> config = config.withDisableSporeUndergroundBias(value));
             }
         }
     }

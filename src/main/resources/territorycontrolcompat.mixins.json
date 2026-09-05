@@ -16,7 +16,8 @@
     "PhayriosisSpawnProcedureMixin",
     "PhayriosisAmbientInsectSpawnMixin",
     "GastgaberBuilderStructureMixin",
-    "SporeScentSummonMixin"
+    "SporeScentSummonMixin",
+    "SporeProtoTerrainMixin"
   ],
   "injectors": { "defaultRequire": 1 }
 }
