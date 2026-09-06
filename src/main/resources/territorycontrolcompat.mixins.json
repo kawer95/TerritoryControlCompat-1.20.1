@@ -15,6 +15,7 @@
     "PhayrileshMiteExpansionMixin",
     "PhayriosisSpawnProcedureMixin",
     "PhayriosisAmbientInsectSpawnMixin",
+    "PhayriosisEntityJoinBiomeMixin",
     "GastgaberBuilderStructureMixin",
     "SporeScentSummonMixin",
     "SporeProtoTerrainMixin"
