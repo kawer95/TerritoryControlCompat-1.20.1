@@ -103,6 +103,12 @@ public final class CompatScreen extends Screen {
                 addToggle(contentX, y + ROW_HEIGHT * 5, contentWidth, "取消地下掘食者偏置", config::disableSporeUndergroundBias,
                         value -> config = config.withDisableSporeUndergroundBias(value));
             }
+            case ABOMINATIONS -> {
+                addToggle(contentX, y, contentWidth, "只能在占领区扩散", config::restrictAbominationsSpread,
+                        value -> config = config.withRestrictAbominationsSpread(value));
+                addToggle(contentX, y + ROW_HEIGHT, contentWidth, "净化模式", config::purgeAbominationsOnLoss,
+                        value -> config = config.withPurgeAbominationsOnLoss(value));
+            }
         }
     }
 
@@ -139,7 +145,8 @@ public final class CompatScreen extends Screen {
         CAERULA("方块与深蓝之树"),
         EYES("眼魔"),
         PHAYRIOSIS("法耶病"),
-        SPORE("真菌感染：孢子");
+        SPORE("真菌感染：孢子"),
+        ABOMINATIONS("觉悟血肉");
 
         private final String title;
 

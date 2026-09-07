@@ -10,7 +10,7 @@ import java.util.Optional;
 
 /** Owns the versioned wire format for the compatibility configuration screen. */
 public final class CompatNetwork {
-    private static final String PROTOCOL_VERSION = "2";
+    private static final String PROTOCOL_VERSION = "3";
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
             ResourceLocation.fromNamespaceAndPath(TerritoryControlCompat.MODID, "main"),
             () -> PROTOCOL_VERSION,

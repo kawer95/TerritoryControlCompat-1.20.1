@@ -31,6 +31,8 @@ public final class CompatSavedData extends SavedData {
         tag.putBoolean("RestoreSporeOnLoss", config.restoreSporeOnLoss());
         tag.putBoolean("RestrictSporeInfectionSpread", config.restrictSporeInfectionSpread());
         tag.putBoolean("DisableSporeUndergroundBias", config.disableSporeUndergroundBias());
+        tag.putBoolean("RestrictAbominationsSpread", config.restrictAbominationsSpread());
+        tag.putBoolean("PurgeAbominationsOnLoss", config.purgeAbominationsOnLoss());
         return tag;
     }
 
@@ -49,7 +51,9 @@ public final class CompatSavedData extends SavedData {
                 tag.getBoolean("RestrictSporeSpawnerStructures"),
                 tag.getBoolean("RestoreSporeOnLoss"),
                 tag.getBoolean("RestrictSporeInfectionSpread"),
-                tag.getBoolean("DisableSporeUndergroundBias"));
+                tag.getBoolean("DisableSporeUndergroundBias"),
+                tag.getBoolean("RestrictAbominationsSpread"),
+                tag.getBoolean("PurgeAbominationsOnLoss"));
         return data;
     }
 
@@ -66,105 +70,124 @@ public final class CompatSavedData extends SavedData {
             boolean restrictSporeSpawnerStructures,
             boolean restoreSporeOnLoss,
             boolean restrictSporeInfectionSpread,
-            boolean disableSporeUndergroundBias) {
+            boolean disableSporeUndergroundBias,
+            boolean restrictAbominationsSpread,
+            boolean purgeAbominationsOnLoss) {
         public static final Config DEFAULT = new Config(false, false, false, false, false, false, false,
-                false, false, false, false, false, false);
+                false, false, false, false, false, false, false, false);
 
         /** Keeps older in-code callers source compatible while new controls default to disabled. */
         public Config(boolean balancedOvaryDensity, boolean restrictCaerula, boolean tideRecession,
                       boolean restrictEyes, boolean eyesCollapse, boolean restrictPhayriosis,
                       boolean phayriosisCure) {
             this(balancedOvaryDensity, restrictCaerula, tideRecession, restrictEyes, eyesCollapse,
-                    restrictPhayriosis, phayriosisCure, false, false, false, false, false, false);
+                    restrictPhayriosis, phayriosisCure, false, false, false, false, false, false,
+                    false, false);
         }
 
         public Config withBalancedOvaryDensity(boolean value) {
             return copy(value, restrictCaerula, tideRecession, restrictEyes, eyesCollapse,
                     restrictPhayriosis, phayriosisCure, restrictSporeMounds, restrictSporeVigils,
                     restrictSporeSpawnerStructures, restoreSporeOnLoss, restrictSporeInfectionSpread,
-                    disableSporeUndergroundBias);
+                    disableSporeUndergroundBias, restrictAbominationsSpread, purgeAbominationsOnLoss);
         }
 
         public Config withRestrictCaerula(boolean value) {
             return copy(balancedOvaryDensity, value, tideRecession, restrictEyes, eyesCollapse,
                     restrictPhayriosis, phayriosisCure, restrictSporeMounds, restrictSporeVigils,
                     restrictSporeSpawnerStructures, restoreSporeOnLoss, restrictSporeInfectionSpread,
-                    disableSporeUndergroundBias);
+                    disableSporeUndergroundBias, restrictAbominationsSpread, purgeAbominationsOnLoss);
         }
 
         public Config withTideRecession(boolean value) {
             return copy(balancedOvaryDensity, restrictCaerula, value, restrictEyes, eyesCollapse,
                     restrictPhayriosis, phayriosisCure, restrictSporeMounds, restrictSporeVigils,
                     restrictSporeSpawnerStructures, restoreSporeOnLoss, restrictSporeInfectionSpread,
-                    disableSporeUndergroundBias);
+                    disableSporeUndergroundBias, restrictAbominationsSpread, purgeAbominationsOnLoss);
         }
 
         public Config withRestrictEyes(boolean value) {
             return copy(balancedOvaryDensity, restrictCaerula, tideRecession, value, eyesCollapse,
                     restrictPhayriosis, phayriosisCure, restrictSporeMounds, restrictSporeVigils,
                     restrictSporeSpawnerStructures, restoreSporeOnLoss, restrictSporeInfectionSpread,
-                    disableSporeUndergroundBias);
+                    disableSporeUndergroundBias, restrictAbominationsSpread, purgeAbominationsOnLoss);
         }
 
         public Config withEyesCollapse(boolean value) {
             return copy(balancedOvaryDensity, restrictCaerula, tideRecession, restrictEyes, value,
                     restrictPhayriosis, phayriosisCure, restrictSporeMounds, restrictSporeVigils,
                     restrictSporeSpawnerStructures, restoreSporeOnLoss, restrictSporeInfectionSpread,
-                    disableSporeUndergroundBias);
+                    disableSporeUndergroundBias, restrictAbominationsSpread, purgeAbominationsOnLoss);
         }
 
         public Config withRestrictPhayriosis(boolean value) {
             return copy(balancedOvaryDensity, restrictCaerula, tideRecession, restrictEyes, eyesCollapse,
                     value, phayriosisCure, restrictSporeMounds, restrictSporeVigils,
                     restrictSporeSpawnerStructures, restoreSporeOnLoss, restrictSporeInfectionSpread,
-                    disableSporeUndergroundBias);
+                    disableSporeUndergroundBias, restrictAbominationsSpread, purgeAbominationsOnLoss);
         }
 
         public Config withPhayriosisCure(boolean value) {
             return copy(balancedOvaryDensity, restrictCaerula, tideRecession, restrictEyes, eyesCollapse,
                     restrictPhayriosis, value, restrictSporeMounds, restrictSporeVigils,
                     restrictSporeSpawnerStructures, restoreSporeOnLoss, restrictSporeInfectionSpread,
-                    disableSporeUndergroundBias);
+                    disableSporeUndergroundBias, restrictAbominationsSpread, purgeAbominationsOnLoss);
         }
 
         public Config withRestrictSporeMounds(boolean value) {
             return new Config(balancedOvaryDensity, restrictCaerula, tideRecession, restrictEyes, eyesCollapse,
                     restrictPhayriosis, phayriosisCure, value, restrictSporeVigils,
                     restrictSporeSpawnerStructures, restoreSporeOnLoss, restrictSporeInfectionSpread,
-                    disableSporeUndergroundBias);
+                    disableSporeUndergroundBias, restrictAbominationsSpread, purgeAbominationsOnLoss);
         }
 
         public Config withRestrictSporeVigils(boolean value) {
             return new Config(balancedOvaryDensity, restrictCaerula, tideRecession, restrictEyes, eyesCollapse,
                     restrictPhayriosis, phayriosisCure, restrictSporeMounds, value,
                     restrictSporeSpawnerStructures, restoreSporeOnLoss, restrictSporeInfectionSpread,
-                    disableSporeUndergroundBias);
+                    disableSporeUndergroundBias, restrictAbominationsSpread, purgeAbominationsOnLoss);
         }
 
         public Config withRestrictSporeSpawnerStructures(boolean value) {
             return new Config(balancedOvaryDensity, restrictCaerula, tideRecession, restrictEyes, eyesCollapse,
                     restrictPhayriosis, phayriosisCure, restrictSporeMounds, restrictSporeVigils,
-                    value, restoreSporeOnLoss, restrictSporeInfectionSpread, disableSporeUndergroundBias);
+                    value, restoreSporeOnLoss, restrictSporeInfectionSpread, disableSporeUndergroundBias,
+                    restrictAbominationsSpread, purgeAbominationsOnLoss);
         }
 
         public Config withRestoreSporeOnLoss(boolean value) {
             return new Config(balancedOvaryDensity, restrictCaerula, tideRecession, restrictEyes, eyesCollapse,
                     restrictPhayriosis, phayriosisCure, restrictSporeMounds, restrictSporeVigils,
                     restrictSporeSpawnerStructures, value, restrictSporeInfectionSpread,
-                    disableSporeUndergroundBias);
+                    disableSporeUndergroundBias, restrictAbominationsSpread, purgeAbominationsOnLoss);
         }
 
         public Config withRestrictSporeInfectionSpread(boolean value) {
             return new Config(balancedOvaryDensity, restrictCaerula, tideRecession, restrictEyes, eyesCollapse,
                     restrictPhayriosis, phayriosisCure, restrictSporeMounds, restrictSporeVigils,
                     restrictSporeSpawnerStructures, restoreSporeOnLoss, value,
-                    disableSporeUndergroundBias);
+                    disableSporeUndergroundBias, restrictAbominationsSpread, purgeAbominationsOnLoss);
         }
 
         public Config withDisableSporeUndergroundBias(boolean value) {
             return copy(balancedOvaryDensity, restrictCaerula, tideRecession, restrictEyes, eyesCollapse,
                     restrictPhayriosis, phayriosisCure, restrictSporeMounds, restrictSporeVigils,
-                    restrictSporeSpawnerStructures, restoreSporeOnLoss, restrictSporeInfectionSpread, value);
+                    restrictSporeSpawnerStructures, restoreSporeOnLoss, restrictSporeInfectionSpread, value,
+                    restrictAbominationsSpread, purgeAbominationsOnLoss);
+        }
+
+        public Config withRestrictAbominationsSpread(boolean value) {
+            return copy(balancedOvaryDensity, restrictCaerula, tideRecession, restrictEyes, eyesCollapse,
+                    restrictPhayriosis, phayriosisCure, restrictSporeMounds, restrictSporeVigils,
+                    restrictSporeSpawnerStructures, restoreSporeOnLoss, restrictSporeInfectionSpread,
+                    disableSporeUndergroundBias, value, purgeAbominationsOnLoss);
+        }
+
+        public Config withPurgeAbominationsOnLoss(boolean value) {
+            return copy(balancedOvaryDensity, restrictCaerula, tideRecession, restrictEyes, eyesCollapse,
+                    restrictPhayriosis, phayriosisCure, restrictSporeMounds, restrictSporeVigils,
+                    restrictSporeSpawnerStructures, restoreSporeOnLoss, restrictSporeInfectionSpread,
+                    disableSporeUndergroundBias, restrictAbominationsSpread, value);
         }
 
         private static Config copy(boolean balancedOvaryDensity, boolean restrictCaerula,
@@ -172,18 +195,20 @@ public final class CompatSavedData extends SavedData {
                                    boolean restrictPhayriosis, boolean phayriosisCure,
                                    boolean restrictSporeMounds, boolean restrictSporeVigils,
                                    boolean restrictSporeSpawnerStructures, boolean restoreSporeOnLoss,
-                                   boolean restrictSporeInfectionSpread, boolean disableSporeUndergroundBias) {
+                                   boolean restrictSporeInfectionSpread, boolean disableSporeUndergroundBias,
+                                   boolean restrictAbominationsSpread, boolean purgeAbominationsOnLoss) {
             return new Config(balancedOvaryDensity, restrictCaerula, tideRecession, restrictEyes, eyesCollapse,
                     restrictPhayriosis, phayriosisCure, restrictSporeMounds, restrictSporeVigils,
                     restrictSporeSpawnerStructures, restoreSporeOnLoss, restrictSporeInfectionSpread,
-                    disableSporeUndergroundBias);
+                    disableSporeUndergroundBias, restrictAbominationsSpread, purgeAbominationsOnLoss);
         }
 
         public Config normalized() { return this; }
 
         public boolean hasPlacementRestrictions() {
             return restrictCaerula || restrictEyes || restrictPhayriosis
-                    || restrictSporeSpawnerStructures || restrictSporeInfectionSpread;
+                    || restrictSporeSpawnerStructures || restrictSporeInfectionSpread
+                    || restrictAbominationsSpread;
         }
     }
 }

@@ -2,6 +2,7 @@ package com.arxyt.territorycontrolcompat;
 
 import com.arxyt.territorycontrol.api.TerritoryControlApi;
 import com.arxyt.territorycontrolcompat.compat.CaerulaArborCompat;
+import com.arxyt.territorycontrolcompat.compat.AbominationsInfectionCompat;
 import com.arxyt.territorycontrolcompat.compat.EyesCompat;
 import com.arxyt.territorycontrolcompat.compat.PhayriosisCompat;
 import com.arxyt.territorycontrolcompat.compat.SporeCompat;
@@ -28,6 +29,7 @@ public final class TerritoryControlCompat {
         TerritoryControlApi.registerOwnershipChangeListener(EyesCompat::onOwnershipChanged);
         TerritoryControlApi.registerOwnershipChangeListener(PhayriosisCompat::onOwnershipChanged);
         TerritoryControlApi.registerOwnershipChangeListener(SporeCompat::onOwnershipChanged);
+        TerritoryControlApi.registerOwnershipChangeListener(AbominationsInfectionCompat::onOwnershipChanged);
         if (ModList.get().isLoaded(CustomNpcFactionProvider.MOD_ID)) {
             // Register even when reflection is unavailable: an applicable CNPC entity must remain
             // terminally unmapped instead of falling through to the whole customnpcs namespace.

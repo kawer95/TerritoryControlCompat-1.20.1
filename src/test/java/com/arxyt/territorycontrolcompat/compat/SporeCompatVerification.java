@@ -30,7 +30,27 @@ public final class SporeCompatVerification {
         verifySporeCleanupClassification();
         verifySporeOrganoidClassification();
         verifyPhayriosisInsectClassification();
+        verifyAbominationsInfectionClassification();
         verifyBuiltinCnpcFactionCatalog();
+    }
+
+    private static void verifyAbominationsInfectionClassification() {
+        List.of("rooted_stone", "rooted_log", "red_root_block", "heart_root_core",
+                        "tumorroot", "parasitic_worm_colony")
+                .forEach(path -> require(AbominationsInfectionCompat.isInfectionBlockId(
+                                ResourceLocation.fromNamespaceAndPath("abominations_infection", path)),
+                        path + " must be restricted as Abominations infection terrain"));
+        require(AbominationsInfectionCompat.cleanupReplacementId(
+                        ResourceLocation.fromNamespaceAndPath("abominations_infection", "rooted_stone"))
+                        .equals(ResourceLocation.withDefaultNamespace("stone")),
+                "rooted stone must restore solid vanilla terrain");
+        require(AbominationsInfectionCompat.cleanupReplacementId(
+                        ResourceLocation.fromNamespaceAndPath("abominations_infection", "heart_root"))
+                        .equals(ResourceLocation.withDefaultNamespace("air")),
+                "newly grown roots must be removed as air");
+        require(!AbominationsInfectionCompat.isInfectionBlockId(
+                        ResourceLocation.fromNamespaceAndPath("abominations_infection", "teeth_block_bricks")),
+                "player construction blocks must not be purged as spreading terrain");
     }
 
     private static void verifyPhayriosisInsectClassification() {

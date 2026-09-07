@@ -21,7 +21,9 @@ public final class CompatBlockPolicy {
     private static final int PHAYRIOSIS = 1 << 3;
     private static final int SPORE_FUNGAL = 1 << 4;
     private static final int SPORE_SPAWNER = 1 << 5;
-    private static final int EXEMPT_MASK = CAERULA_POLLUTION | EYES_REPLACEMENT | PHAYRIOSIS | SPORE_FUNGAL;
+    private static final int ABOMINATIONS_INFECTION = 1 << 6;
+    private static final int EXEMPT_MASK = CAERULA_POLLUTION | EYES_REPLACEMENT | PHAYRIOSIS
+            | SPORE_FUNGAL | ABOMINATIONS_INFECTION;
     private static volatile Reference2IntOpenHashMap<Block> policies;
 
     private CompatBlockPolicy() {
@@ -39,6 +41,7 @@ public final class CompatBlockPolicy {
             if (PhayriosisCompat.isPhayriosisBlock(state)) mask |= PHAYRIOSIS;
             if (SporeCompat.isFungalInfectionBlock(state)) mask |= SPORE_FUNGAL;
             if (SporeCompat.isOvergrownSpawner(state)) mask |= SPORE_SPAWNER;
+            if (AbominationsInfectionCompat.isInfectionBlock(state)) mask |= ABOMINATIONS_INFECTION;
             if (mask != 0) compiled.put(block, mask);
         }
         policies = compiled;
@@ -56,10 +59,13 @@ public final class CompatBlockPolicy {
         boolean phayriosis = config.restrictPhayriosis() && (mask & PHAYRIOSIS) != 0;
         boolean spore = (config.restrictSporeInfectionSpread() && (mask & SPORE_FUNGAL) != 0)
                 || (config.restrictSporeSpawnerStructures() && (mask & SPORE_SPAWNER) != 0);
-        if (!caerula && !eyes && !phayriosis && !spore) return true;
+        boolean abominations = config.restrictAbominationsSpread()
+                && (mask & ABOMINATIONS_INFECTION) != 0;
+        if (!caerula && !eyes && !phayriosis && !spore && !abominations) return true;
         String modId = caerula ? CaerulaArborCompat.MOD_ID
                 : eyes ? EyesCompat.MOD_ID
                 : phayriosis ? PhayriosisCompat.MOD_ID
+                : abominations ? AbominationsInfectionCompat.MOD_ID
                 : SporeCompat.MOD_ID;
         return TerritoryControlApi.isOwnedByModFaction(server, pos, modId);
     }
