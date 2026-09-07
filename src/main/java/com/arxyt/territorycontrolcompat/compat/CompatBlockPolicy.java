@@ -22,6 +22,7 @@ public final class CompatBlockPolicy {
     private static final int SPORE_FUNGAL = 1 << 4;
     private static final int SPORE_SPAWNER = 1 << 5;
     private static final int ABOMINATIONS_INFECTION = 1 << 6;
+    private static final int PRION_TERRITORY = 1 << 7;
     private static final int EXEMPT_MASK = CAERULA_POLLUTION | EYES_REPLACEMENT | PHAYRIOSIS
             | SPORE_FUNGAL | ABOMINATIONS_INFECTION;
     private static volatile Reference2IntOpenHashMap<Block> policies;
@@ -42,6 +43,7 @@ public final class CompatBlockPolicy {
             if (SporeCompat.isFungalInfectionBlock(state)) mask |= SPORE_FUNGAL;
             if (SporeCompat.isOvergrownSpawner(state)) mask |= SPORE_SPAWNER;
             if (AbominationsInfectionCompat.isInfectionBlock(state)) mask |= ABOMINATIONS_INFECTION;
+            if (PrionCompat.isTerritoryBlock(state)) mask |= PRION_TERRITORY;
             if (mask != 0) compiled.put(block, mask);
         }
         policies = compiled;
@@ -61,17 +63,20 @@ public final class CompatBlockPolicy {
                 || (config.restrictSporeSpawnerStructures() && (mask & SPORE_SPAWNER) != 0);
         boolean abominations = config.restrictAbominationsSpread()
                 && (mask & ABOMINATIONS_INFECTION) != 0;
-        if (!caerula && !eyes && !phayriosis && !spore && !abominations) return true;
+        boolean prion = config.restrictPrionTerrain() && (mask & PRION_TERRITORY) != 0;
+        if (!caerula && !eyes && !phayriosis && !spore && !abominations && !prion) return true;
         String modId = caerula ? CaerulaArborCompat.MOD_ID
                 : eyes ? EyesCompat.MOD_ID
                 : phayriosis ? PhayriosisCompat.MOD_ID
                 : abominations ? AbominationsInfectionCompat.MOD_ID
+                : prion ? PrionCompat.MOD_ID
                 : SporeCompat.MOD_ID;
         return TerritoryControlApi.isOwnedByModFaction(server, pos, modId);
     }
 
     public static boolean protectionExempt(LevelAccessor level, BlockPos pos, BlockState oldState, BlockState newState) {
-        return (policy(oldState.getBlock()) & EXEMPT_MASK) != 0;
+        return (policy(oldState.getBlock()) & EXEMPT_MASK) != 0
+                || PrionCompat.isEggLifecycleRemoval(oldState, newState);
     }
 
     static int policy(Block block) {

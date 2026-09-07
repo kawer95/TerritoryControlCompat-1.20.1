@@ -1,6 +1,10 @@
 package com.arxyt.territorycontrolcompat.compat;
 
 import com.arxyt.territorycontrol.api.EntityFactionProvider;
+import com.arxyt.territorycontrolcompat.data.CompatSavedData;
+import com.arxyt.territorycontrolcompat.network.CompatConfigPacket;
+import io.netty.buffer.Unpooled;
+import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceLocation;
 
 import java.util.List;
@@ -31,7 +35,37 @@ public final class SporeCompatVerification {
         verifySporeOrganoidClassification();
         verifyPhayriosisInsectClassification();
         verifyAbominationsInfectionClassification();
+        verifyPrionClassification();
+        verifyCompatConfigPacketRoundTrip();
         verifyBuiltinCnpcFactionCatalog();
+    }
+
+    private static void verifyCompatConfigPacketRoundTrip() {
+        CompatSavedData.Config expected = CompatSavedData.Config.DEFAULT
+                .withRestrictPrionTerrain(true)
+                .withPurgePrionOnLoss(true);
+        FriendlyByteBuf buffer = new FriendlyByteBuf(Unpooled.buffer());
+        new CompatConfigPacket(expected, true).encode(buffer);
+        CompatConfigPacket decoded = CompatConfigPacket.decode(buffer);
+        require(decoded.open() && decoded.config().equals(expected),
+                "compat config network order must preserve the Prion controls");
+        buffer.release();
+    }
+
+    private static void verifyPrionClassification() {
+        List.of("root_block", "living_block", "nox_block", "entrails_block", "eggs_block")
+                .forEach(path -> require(PrionCompat.isTerritoryBlockId(
+                                ResourceLocation.fromNamespaceAndPath("prionmod", path)),
+                        path + " must be restricted and purged as Prion terrain"));
+        require(PrionCompat.isEggsBlockId(
+                        ResourceLocation.fromNamespaceAndPath("prionmod", "eggs_block")),
+                "eggs block must be recognized for its lifecycle removal exemption");
+        require(!PrionCompat.isTerritoryBlockId(
+                        ResourceLocation.fromNamespaceAndPath("prionmod", "decorative_block")),
+                "unknown Prion blocks must not be purged");
+        require(!PrionCompat.isTerritoryBlockId(
+                        ResourceLocation.fromNamespaceAndPath("minecraft", "rooted_dirt")),
+                "vanilla terrain must not be treated as Prion terrain");
     }
 
     private static void verifyAbominationsInfectionClassification() {

@@ -6,6 +6,7 @@ import com.arxyt.territorycontrolcompat.compat.AbominationsInfectionCompat;
 import com.arxyt.territorycontrolcompat.compat.EyesCompat;
 import com.arxyt.territorycontrolcompat.compat.PhayriosisCompat;
 import com.arxyt.territorycontrolcompat.compat.SporeCompat;
+import com.arxyt.territorycontrolcompat.compat.PrionCompat;
 import com.arxyt.territorycontrolcompat.compat.SporeEntitySpawnHandler;
 import com.arxyt.territorycontrolcompat.compat.CompatBlockPolicy;
 import com.arxyt.territorycontrolcompat.compat.CustomNpcFactionProvider;
@@ -30,6 +31,7 @@ public final class TerritoryControlCompat {
         TerritoryControlApi.registerOwnershipChangeListener(PhayriosisCompat::onOwnershipChanged);
         TerritoryControlApi.registerOwnershipChangeListener(SporeCompat::onOwnershipChanged);
         TerritoryControlApi.registerOwnershipChangeListener(AbominationsInfectionCompat::onOwnershipChanged);
+        TerritoryControlApi.registerOwnershipChangeListener(PrionCompat::onOwnershipChanged);
         if (ModList.get().isLoaded(CustomNpcFactionProvider.MOD_ID)) {
             // Register even when reflection is unavailable: an applicable CNPC entity must remain
             // terminally unmapped instead of falling through to the whole customnpcs namespace.

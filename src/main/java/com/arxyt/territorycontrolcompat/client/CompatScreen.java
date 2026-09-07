@@ -109,6 +109,12 @@ public final class CompatScreen extends Screen {
                 addToggle(contentX, y + ROW_HEIGHT, contentWidth, "净化模式", config::purgeAbominationsOnLoss,
                         value -> config = config.withPurgeAbominationsOnLoss(value));
             }
+            case PRION -> {
+                addToggle(contentX, y, contentWidth, "感染地块仅能在实控区生成", config::restrictPrionTerrain,
+                        value -> config = config.withRestrictPrionTerrain(value));
+                addToggle(contentX, y + ROW_HEIGHT, contentWidth, "失去实控权时清除感染地块", config::purgePrionOnLoss,
+                        value -> config = config.withPurgePrionOnLoss(value));
+            }
         }
     }
 
@@ -146,7 +152,8 @@ public final class CompatScreen extends Screen {
         EYES("眼魔"),
         PHAYRIOSIS("法耶病"),
         SPORE("真菌感染：孢子"),
-        ABOMINATIONS("觉悟血肉");
+        ABOMINATIONS("觉悟血肉"),
+        PRION("朊病毒");
 
         private final String title;
 

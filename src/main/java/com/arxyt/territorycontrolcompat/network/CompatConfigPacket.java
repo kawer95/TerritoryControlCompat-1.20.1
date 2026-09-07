@@ -26,6 +26,8 @@ public record CompatConfigPacket(CompatSavedData.Config config, boolean open) {
         buffer.writeBoolean(config.disableSporeUndergroundBias());
         buffer.writeBoolean(config.restrictAbominationsSpread());
         buffer.writeBoolean(config.purgeAbominationsOnLoss());
+        buffer.writeBoolean(config.restrictPrionTerrain());
+        buffer.writeBoolean(config.purgePrionOnLoss());
         buffer.writeBoolean(open);
     }
 
@@ -35,7 +37,8 @@ public record CompatConfigPacket(CompatSavedData.Config config, boolean open) {
                 buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean(),
                 buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean(),
                 buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean(),
-                buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean());
+                buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean(),
+                buffer.readBoolean(), buffer.readBoolean());
         return new CompatConfigPacket(config, buffer.readBoolean());
     }
 
