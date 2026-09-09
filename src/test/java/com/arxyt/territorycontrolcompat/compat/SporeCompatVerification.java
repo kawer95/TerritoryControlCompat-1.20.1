@@ -38,6 +38,7 @@ public final class SporeCompatVerification {
         verifyPrionClassification();
         verifyCompatConfigPacketRoundTrip();
         verifyBuiltinCnpcFactionCatalog();
+        verifyRatWarlordsFactionCatalog();
     }
 
     private static void verifyCompatConfigPacketRoundTrip() {
@@ -146,6 +147,21 @@ public final class SporeCompatVerification {
                 List.of(new EntityFactionProvider.Option("0", "友好", 0x00DD00)));
         require(renamed.stream().anyMatch(option -> option.key().equals("0") && option.name().equals("友好")),
                 "CNPC-provided localized name must not be overwritten");
+    }
+
+    private static void verifyRatWarlordsFactionCatalog() {
+        List<EntityFactionProvider.Option> factions = RatWarlordsFactionProvider.factionCatalog();
+        require(factions.size() == 2, "Rat Warlords must expose exactly two configured factions");
+        require(factions.stream().anyMatch(option -> option.key().equals("rat_warlords:rat_alliance")
+                        && option.color() == 0x55AA55),
+                "Rat Alliance must retain its stable key and green color");
+        require(factions.stream().anyMatch(option -> option.key().equals("rat_warlords:rat_warlords")
+                        && option.color() == 0xAA3333),
+                "Rat Warlords must retain its stable key and red color");
+        RatWarlordsFactionProvider provider = new RatWarlordsFactionProvider();
+        require(!provider.supports(null), "null must not be claimed by the Rat Warlords provider");
+        require(provider.resolve(null).kind() == EntityFactionProvider.ResolutionKind.NOT_APPLICABLE,
+                "unsupported entities must remain not applicable");
     }
 
     private static void require(boolean condition, String message) {

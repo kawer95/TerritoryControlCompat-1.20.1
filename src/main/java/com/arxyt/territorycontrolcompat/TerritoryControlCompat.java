@@ -10,6 +10,7 @@ import com.arxyt.territorycontrolcompat.compat.PrionCompat;
 import com.arxyt.territorycontrolcompat.compat.SporeEntitySpawnHandler;
 import com.arxyt.territorycontrolcompat.compat.CompatBlockPolicy;
 import com.arxyt.territorycontrolcompat.compat.CustomNpcFactionProvider;
+import com.arxyt.territorycontrolcompat.compat.RatWarlordsFactionProvider;
 import com.arxyt.territorycontrolcompat.network.CompatNetwork;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.api.distmarker.Dist;
@@ -36,6 +37,9 @@ public final class TerritoryControlCompat {
             // Register even when reflection is unavailable: an applicable CNPC entity must remain
             // terminally unmapped instead of falling through to the whole customnpcs namespace.
             TerritoryControlApi.registerEntityFactionProvider(new CustomNpcFactionProvider());
+        }
+        if (ModList.get().isLoaded(RatWarlordsFactionProvider.MOD_ID)) {
+            TerritoryControlApi.registerEntityFactionProvider(new RatWarlordsFactionProvider());
         }
         MinecraftForge.EVENT_BUS.register(new SporeEntitySpawnHandler());
         CompatNetwork.register();
