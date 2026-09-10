@@ -23,7 +23,7 @@ dependencies {
     implementation fg.deobf(files('../TerritoryControl-1.20.1/build/libs/territorycontrol-0.10.16.jar'))
     // Rat Warlords' release JAR is reobfuscated. Compile against its official-mapping class output
     // so calls through the public faction API remain valid in this ForgeGradle userdev workspace.
-    implementation files('../RatWarlords-1.20.1/build/classes/java/main')
+    implementation files('../RatNations-1.20.1/build/classes/java/main')
 }
 
 tasks.named('jar', Jar).configure {
