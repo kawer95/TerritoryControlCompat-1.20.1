@@ -1,6 +1,6 @@
 package com.arxyt.territorycontrolcompat.compat;
 
-import com.arxyt.ratwarlords.api.FactionRelation;
+import com.arxyt.ratnations.api.FactionRelation;
 import com.arxyt.territorycontrol.api.TerritoryControlApi;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;

@@ -1,7 +1,7 @@
 package com.arxyt.territorycontrolcompat;
 
 import com.arxyt.territorycontrol.api.TerritoryControlApi;
-import com.arxyt.ratwarlords.api.RatNationsFactionApi;
+import com.arxyt.ratnations.api.RatNationsFactionApi;
 import com.arxyt.territorycontrolcompat.compat.CaerulaArborCompat;
 import com.arxyt.territorycontrolcompat.compat.AbominationsInfectionCompat;
 import com.arxyt.territorycontrolcompat.compat.EyesCompat;
@@ -11,7 +11,7 @@ import com.arxyt.territorycontrolcompat.compat.PrionCompat;
 import com.arxyt.territorycontrolcompat.compat.SporeEntitySpawnHandler;
 import com.arxyt.territorycontrolcompat.compat.CompatBlockPolicy;
 import com.arxyt.territorycontrolcompat.compat.CustomNpcFactionProvider;
-import com.arxyt.territorycontrolcompat.compat.RatWarlordsFactionProvider;
+import com.arxyt.territorycontrolcompat.compat.RatNationsFactionProvider;
 import com.arxyt.territorycontrolcompat.compat.RatNationsDiplomacyResolver;
 import com.arxyt.territorycontrolcompat.network.CompatNetwork;
 import net.minecraftforge.fml.common.Mod;
@@ -40,8 +40,8 @@ public final class TerritoryControlCompat {
             // terminally unmapped instead of falling through to the whole customnpcs namespace.
             TerritoryControlApi.registerEntityFactionProvider(new CustomNpcFactionProvider());
         }
-        if (ModList.get().isLoaded(RatWarlordsFactionProvider.MOD_ID)) {
-            TerritoryControlApi.registerEntityFactionProvider(new RatWarlordsFactionProvider());
+        if (ModList.get().isLoaded(RatNationsFactionProvider.MOD_ID)) {
+            TerritoryControlApi.registerEntityFactionProvider(new RatNationsFactionProvider());
             RatNationsFactionApi.registerExternalDiplomacyResolver(
                     new net.minecraft.resources.ResourceLocation(MODID, "rat_nations_diplomacy"), 1000,
                     RatNationsDiplomacyResolver::resolve);

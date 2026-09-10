@@ -1,7 +1,7 @@
 package com.arxyt.territorycontrolcompat.compat;
 
-import com.arxyt.ratwarlords.api.FactionDescriptor;
-import com.arxyt.ratwarlords.api.RatNationsFactionApi;
+import com.arxyt.ratnations.api.FactionDescriptor;
+import com.arxyt.ratnations.api.RatNationsFactionApi;
 import com.arxyt.territorycontrol.api.EntityFactionProvider;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
@@ -9,16 +9,15 @@ import net.minecraft.world.entity.Entity;
 import net.minecraftforge.registries.ForgeRegistries;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * Optional Rat Nations bridge. It keeps the federation and empire armies independently
- * assignable instead of collapsing every {@code rat_warlords} entity into one mod faction.
+ * assignable instead of collapsing every {@code rat_nations} entity into one mod faction.
  * Unknown entities from the namespace are deliberately terminally unmapped.
  */
-public final class RatWarlordsFactionProvider implements EntityFactionProvider {
-    public static final String PROVIDER_ID = "rat_warlords:faction";
-    public static final String MOD_ID = "rat_warlords";
+public final class RatNationsFactionProvider implements EntityFactionProvider {
+    public static final String PROVIDER_ID = "rat_nations:faction";
+    public static final String MOD_ID = "rat_nations";
 
     @Override
     public String id() {
@@ -53,19 +52,12 @@ public final class RatWarlordsFactionProvider implements EntityFactionProvider {
 
     static List<Option> factionCatalog() {
         return RatNationsFactionApi.factions().stream()
-                .map(RatWarlordsFactionProvider::toOption)
+                .map(RatNationsFactionProvider::toOption)
                 .toList();
     }
 
     static String factionKey(ResourceLocation id) {
         return id.toString();
-    }
-
-    @Override
-    public Map<String, String> legacyKeyAliases() {
-        return Map.of(
-                "rat_warlords:rat_alliance", RatNationsFactionApi.RAT_FEDERATION.toString(),
-                "rat_warlords:rat_warlords", RatNationsFactionApi.RAT_EMPIRE.toString());
     }
 
     private static Option toOption(FactionDescriptor faction) {

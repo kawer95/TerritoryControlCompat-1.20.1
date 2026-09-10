@@ -38,7 +38,7 @@ public final class SporeCompatVerification {
         verifyPrionClassification();
         verifyCompatConfigPacketRoundTrip();
         verifyBuiltinCnpcFactionCatalog();
-        verifyRatWarlordsFactionCatalog();
+        verifyRatNationsFactionCatalog();
     }
 
     private static void verifyCompatConfigPacketRoundTrip() {
@@ -149,27 +149,19 @@ public final class SporeCompatVerification {
                 "CNPC-provided localized name must not be overwritten");
     }
 
-    private static void verifyRatWarlordsFactionCatalog() {
-        List<EntityFactionProvider.Option> factions = RatWarlordsFactionProvider.factionCatalog();
+    private static void verifyRatNationsFactionCatalog() {
+        List<EntityFactionProvider.Option> factions = RatNationsFactionProvider.factionCatalog();
         require(factions.size() == 2, "Rat Nations must expose exactly two configured factions");
-        require(factions.stream().anyMatch(option -> option.key().equals("rat_warlords:rat_federation")
+        require(factions.stream().anyMatch(option -> option.key().equals("rat_nations:rat_federation")
                         && option.color() == 0x55AA55),
                 "Rat Federation must retain its stable key and green color");
-        require(factions.stream().anyMatch(option -> option.key().equals("rat_warlords:rat_empire")
+        require(factions.stream().anyMatch(option -> option.key().equals("rat_nations:rat_empire")
                         && option.color() == 0xAA3333),
                 "Rat Empire must retain its stable key and red color");
-        require(providerAliases().equals(java.util.Map.of(
-                        "rat_warlords:rat_alliance", "rat_warlords:rat_federation",
-                        "rat_warlords:rat_warlords", "rat_warlords:rat_empire")),
-                "Rat Nations old provider keys must remain migration aliases");
-        RatWarlordsFactionProvider provider = new RatWarlordsFactionProvider();
-        require(!provider.supports(null), "null must not be claimed by the Rat Warlords provider");
+        RatNationsFactionProvider provider = new RatNationsFactionProvider();
+        require(!provider.supports(null), "null must not be claimed by the Rat Nations provider");
         require(provider.resolve(null).kind() == EntityFactionProvider.ResolutionKind.NOT_APPLICABLE,
                 "unsupported entities must remain not applicable");
-    }
-
-    private static java.util.Map<String, String> providerAliases() {
-        return new RatWarlordsFactionProvider().legacyKeyAliases();
     }
 
     private static void require(boolean condition, String message) {
