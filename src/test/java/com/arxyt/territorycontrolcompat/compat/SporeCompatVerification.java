@@ -151,17 +151,25 @@ public final class SporeCompatVerification {
 
     private static void verifyRatWarlordsFactionCatalog() {
         List<EntityFactionProvider.Option> factions = RatWarlordsFactionProvider.factionCatalog();
-        require(factions.size() == 2, "Rat Warlords must expose exactly two configured factions");
-        require(factions.stream().anyMatch(option -> option.key().equals("rat_warlords:rat_alliance")
+        require(factions.size() == 2, "Rat Nations must expose exactly two configured factions");
+        require(factions.stream().anyMatch(option -> option.key().equals("rat_warlords:rat_federation")
                         && option.color() == 0x55AA55),
-                "Rat Alliance must retain its stable key and green color");
-        require(factions.stream().anyMatch(option -> option.key().equals("rat_warlords:rat_warlords")
+                "Rat Federation must retain its stable key and green color");
+        require(factions.stream().anyMatch(option -> option.key().equals("rat_warlords:rat_empire")
                         && option.color() == 0xAA3333),
-                "Rat Warlords must retain its stable key and red color");
+                "Rat Empire must retain its stable key and red color");
+        require(providerAliases().equals(java.util.Map.of(
+                        "rat_warlords:rat_alliance", "rat_warlords:rat_federation",
+                        "rat_warlords:rat_warlords", "rat_warlords:rat_empire")),
+                "Rat Nations old provider keys must remain migration aliases");
         RatWarlordsFactionProvider provider = new RatWarlordsFactionProvider();
         require(!provider.supports(null), "null must not be claimed by the Rat Warlords provider");
         require(provider.resolve(null).kind() == EntityFactionProvider.ResolutionKind.NOT_APPLICABLE,
                 "unsupported entities must remain not applicable");
+    }
+
+    private static java.util.Map<String, String> providerAliases() {
+        return new RatWarlordsFactionProvider().legacyKeyAliases();
     }
 
     private static void require(boolean condition, String message) {

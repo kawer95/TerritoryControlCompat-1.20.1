@@ -1,7 +1,7 @@
 package com.arxyt.territorycontrolcompat.compat;
 
 import com.arxyt.ratwarlords.api.FactionDescriptor;
-import com.arxyt.ratwarlords.api.RatWarlordsFactionApi;
+import com.arxyt.ratwarlords.api.RatNationsFactionApi;
 import com.arxyt.territorycontrol.api.EntityFactionProvider;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
@@ -9,9 +9,10 @@ import net.minecraft.world.entity.Entity;
 import net.minecraftforge.registries.ForgeRegistries;
 
 import java.util.List;
+import java.util.Map;
 
 /**
- * Optional Rat Warlords bridge. It keeps the alliance and warlord armies independently
+ * Optional Rat Nations bridge. It keeps the federation and empire armies independently
  * assignable instead of collapsing every {@code rat_warlords} entity into one mod faction.
  * Unknown entities from the namespace are deliberately terminally unmapped.
  */
@@ -32,7 +33,7 @@ public final class RatWarlordsFactionProvider implements EntityFactionProvider {
     @Override
     public boolean supports(Entity entity) {
         if (entity == null) return false;
-        if (RatWarlordsFactionApi.factionOf(entity).isPresent()) return true;
+        if (RatNationsFactionApi.factionOf(entity).isPresent()) return true;
         ResourceLocation entityId = ForgeRegistries.ENTITY_TYPES.getKey(entity.getType());
         return entityId != null && MOD_ID.equals(entityId.getNamespace());
     }
@@ -40,7 +41,7 @@ public final class RatWarlordsFactionProvider implements EntityFactionProvider {
     @Override
     public Resolution resolve(Entity entity) {
         if (!supports(entity)) return Resolution.notApplicable();
-        return RatWarlordsFactionApi.factionOf(entity)
+        return RatNationsFactionApi.factionOf(entity)
                 .map(id -> Resolution.mapped(factionKey(id)))
                 .orElseGet(Resolution::unmapped);
     }
@@ -51,13 +52,20 @@ public final class RatWarlordsFactionProvider implements EntityFactionProvider {
     }
 
     static List<Option> factionCatalog() {
-        return RatWarlordsFactionApi.factions().stream()
+        return RatNationsFactionApi.factions().stream()
                 .map(RatWarlordsFactionProvider::toOption)
                 .toList();
     }
 
     static String factionKey(ResourceLocation id) {
         return id.toString();
+    }
+
+    @Override
+    public Map<String, String> legacyKeyAliases() {
+        return Map.of(
+                "rat_warlords:rat_alliance", RatNationsFactionApi.RAT_FEDERATION.toString(),
+                "rat_warlords:rat_warlords", RatNationsFactionApi.RAT_EMPIRE.toString());
     }
 
     private static Option toOption(FactionDescriptor faction) {

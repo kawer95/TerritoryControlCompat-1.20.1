@@ -8,7 +8,7 @@ version="${file.jarVersion}"
 displayName="界域沙盘：模组适配"
 logoFile="territorycontrolcompat.png"
 authors="ARXYT"
-description='''界域沙盘的可选模组适配附属。提供方块与深蓝之树、眼魔、法耶病、真菌感染：孢子、觉悟血肉、朊病毒等模组的扩散限制与易主清理逻辑，并为 CustomNPCs 与鼠族军阀提供子阵营映射。需要安装界域沙盘本体。'''
+description='''界域沙盘的可选模组适配附属。提供方块与深蓝之树、眼魔、法耶病、真菌感染：孢子、觉悟血肉、朊病毒等模组的扩散限制与易主清理逻辑，并为 CustomNPCs 与鼠族诸国提供子阵营映射和外交覆盖。需要安装界域沙盘本体。'''
 
 [[dependencies.territorycontrolcompat]]
 modId="forge"
@@ -55,7 +55,7 @@ side="BOTH"
 [[dependencies.territorycontrolcompat]]
 modId="rat_warlords"
 mandatory=false
-versionRange="[0.1.0,)"
+versionRange="[0.2.0,)"
 ordering="AFTER"
 side="BOTH"
 
@@ -69,6 +69,6 @@ side="BOTH"
 [[dependencies.territorycontrolcompat]]
 modId="territorycontrol"
 mandatory=true
-versionRange="[0.8.9,)"
+versionRange="[0.10.16,)"
 ordering="AFTER"
 side="BOTH"

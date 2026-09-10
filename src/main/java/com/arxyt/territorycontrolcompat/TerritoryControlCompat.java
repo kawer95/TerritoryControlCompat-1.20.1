@@ -1,6 +1,7 @@
 package com.arxyt.territorycontrolcompat;
 
 import com.arxyt.territorycontrol.api.TerritoryControlApi;
+import com.arxyt.ratwarlords.api.RatNationsFactionApi;
 import com.arxyt.territorycontrolcompat.compat.CaerulaArborCompat;
 import com.arxyt.territorycontrolcompat.compat.AbominationsInfectionCompat;
 import com.arxyt.territorycontrolcompat.compat.EyesCompat;
@@ -11,6 +12,7 @@ import com.arxyt.territorycontrolcompat.compat.SporeEntitySpawnHandler;
 import com.arxyt.territorycontrolcompat.compat.CompatBlockPolicy;
 import com.arxyt.territorycontrolcompat.compat.CustomNpcFactionProvider;
 import com.arxyt.territorycontrolcompat.compat.RatWarlordsFactionProvider;
+import com.arxyt.territorycontrolcompat.compat.RatNationsDiplomacyResolver;
 import com.arxyt.territorycontrolcompat.network.CompatNetwork;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.api.distmarker.Dist;
@@ -40,6 +42,9 @@ public final class TerritoryControlCompat {
         }
         if (ModList.get().isLoaded(RatWarlordsFactionProvider.MOD_ID)) {
             TerritoryControlApi.registerEntityFactionProvider(new RatWarlordsFactionProvider());
+            RatNationsFactionApi.registerExternalDiplomacyResolver(
+                    new net.minecraft.resources.ResourceLocation(MODID, "rat_nations_diplomacy"), 1000,
+                    RatNationsDiplomacyResolver::resolve);
         }
         MinecraftForge.EVENT_BUS.register(new SporeEntitySpawnHandler());
         CompatNetwork.register();
