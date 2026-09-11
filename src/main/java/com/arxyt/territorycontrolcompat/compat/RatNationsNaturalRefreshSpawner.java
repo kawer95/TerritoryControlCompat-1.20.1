@@ -27,6 +27,8 @@ import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobSpawnType;
 import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -51,6 +53,7 @@ public final class RatNationsNaturalRefreshSpawner {
     public static final int MILITARY_CAP = 30;
     public static final int CIVILIAN_CAP = 10;
     static final int MAX_POSITION_ATTEMPTS = 64;
+    static final int MAX_INDOOR_SCAN_DEPTH = 64;
 
     static final List<RoleWeight> ROLE_WEIGHTS = List.of(
             new RoleWeight("rifleman", 20),
@@ -316,19 +319,51 @@ public final class RatNationsNaturalRefreshSpawner {
             if (y <= level.getMinBuildHeight() || y + 2 >= level.getMaxBuildHeight()) {
                 continue;
             }
-            if (!level.hasChunk(x >> 4, z >> 4) || !isSurfaceHeight(level, x, y, z)
-                    || !hasSolidFloor(level, x, y, z)
-                    || (!level.dimensionType().hasCeiling() && !hasOpenSkyAbove(level, x + 1, y + 3, z + 1))
-                    || !hasAirVolume(level, x, y, z)) {
+            if (!level.hasChunk(x >> 4, z >> 4)) {
                 continue;
             }
 
-            entity.moveTo(x + 1.5D, y, z + 1.5D, random.nextFloat() * 360.0F, 0.0F);
-            if (level.noCollision(entity)) {
-                return new BlockPos(x, y, z);
+            if (!level.dimensionType().hasCeiling()) {
+                BlockPos indoorPosition = findIndoorSpawnPosition(level, entity, x, y, z, random);
+                if (indoorPosition != null) {
+                    return indoorPosition;
+                }
+            }
+
+            if (isSurfaceHeight(level, x, y, z)
+                    && hasSolidFloor(level, x, y, z)
+                    && hasAirVolume(level, x, y, z)
+                    && (level.dimensionType().hasCeiling() || hasOpenSkyAbove(level, x + 1, y + 3, z + 1))) {
+                BlockPos surfacePosition = tryPosition(level, entity, x, y, z, random);
+                if (surfacePosition != null) {
+                    return surfacePosition;
+                }
             }
         }
         return null;
+    }
+
+    private static BlockPos findIndoorSpawnPosition(ServerLevel level, Mob entity, int x, int surfaceY, int z,
+                                                     RandomSource random) {
+        int lowestY = Math.max(level.getMinBuildHeight() + 1, surfaceY - MAX_INDOOR_SCAN_DEPTH);
+        for (int y = surfaceY - 1; y >= lowestY; y--) {
+            if (!hasSolidFloor(level, x, y, z) || !hasAirVolume(level, x, y, z)
+                    || !hasConstructionCoverAbove(level, x + 1, y + 3, z + 1)
+                    || !hasOpenSkyAbove(level, x + 1, y + 3, z + 1)) {
+                continue;
+            }
+            BlockPos position = tryPosition(level, entity, x, y, z, random);
+            if (position != null) {
+                return position;
+            }
+        }
+        return null;
+    }
+
+    private static BlockPos tryPosition(ServerLevel level, Mob entity, int x, int y, int z,
+                                         RandomSource random) {
+        entity.moveTo(x + 1.5D, y, z + 1.5D, random.nextFloat() * 360.0F, 0.0F);
+        return level.noCollision(entity) ? new BlockPos(x, y, z) : null;
     }
 
     private static boolean isSurfaceHeight(ServerLevel level, int x, int y, int z) {
@@ -345,11 +380,44 @@ public final class RatNationsNaturalRefreshSpawner {
     private static boolean hasOpenSkyAbove(ServerLevel level, int x, int startY, int z) {
         for (int y = startY; y < level.getMaxBuildHeight(); y++) {
             var state = level.getBlockState(new BlockPos(x, y, z));
-            if (!state.isAir() && !state.is(BlockTags.LEAVES)) {
+            if (!state.isAir() && !state.is(BlockTags.LEAVES) && !isConstructionBlock(state)) {
                 return false;
             }
         }
         return true;
+    }
+
+    private static boolean hasConstructionCoverAbove(ServerLevel level, int x, int startY, int z) {
+        boolean foundConstruction = false;
+        for (int y = startY; y < level.getMaxBuildHeight(); y++) {
+            var state = level.getBlockState(new BlockPos(x, y, z));
+            if (state.isAir() || state.is(BlockTags.LEAVES)) {
+                continue;
+            }
+            if (!isConstructionBlock(state)) {
+                return false;
+            }
+            foundConstruction = true;
+        }
+        return foundConstruction;
+    }
+
+    static boolean isConstructionBlock(BlockState state) {
+        return state.is(BlockTags.PLANKS)
+                || state.is(BlockTags.LOGS)
+                || state.is(BlockTags.STONE_BRICKS)
+                || state.is(BlockTags.STAIRS)
+                || state.is(BlockTags.SLABS)
+                || state.is(BlockTags.WALLS)
+                || state.is(BlockTags.DOORS)
+                || state.is(BlockTags.TRAPDOORS)
+                || state.is(BlockTags.FENCES)
+                || state.is(BlockTags.WOOL)
+                || state.is(Blocks.COBBLESTONE)
+                || state.is(Blocks.MOSSY_COBBLESTONE)
+                || state.is(Blocks.COBBLED_DEEPSLATE)
+                || state.is(Blocks.BLACKSTONE)
+                || state.is(Blocks.POLISHED_BLACKSTONE);
     }
 
     private static boolean hasSolidFloor(ServerLevel level, int x, int y, int z) {
