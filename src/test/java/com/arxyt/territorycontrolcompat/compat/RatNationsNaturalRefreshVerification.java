@@ -69,6 +69,19 @@ public final class RatNationsNaturalRefreshVerification {
             require(RatNationsNaturalRefreshSpawner.requestedCount(random, 1) == 1,
                     "refresh request must truncate to one remaining slot");
         }
+
+        long seed = 0L;
+        int expectedMilitary;
+        int expectedCivilian;
+        do {
+            RandomSource expectedRandom = RandomSource.create(seed++);
+            expectedMilitary = expectedRandom.nextInt(2) + 1;
+            expectedCivilian = expectedRandom.nextInt(2) + 1;
+        } while (expectedMilitary == expectedCivilian);
+        RatNationsNaturalRefreshSpawner.RefreshCounts counts =
+                RatNationsNaturalRefreshSpawner.requestedCounts(RandomSource.create(seed - 1), 99, 99);
+        require(counts.military() == expectedMilitary && counts.civilian() == expectedCivilian,
+                "military and civilian batches must each make an independent one-to-two roll");
     }
 
     private static void verifyOfficialRoleWeights() {

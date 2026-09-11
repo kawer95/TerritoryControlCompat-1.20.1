@@ -112,17 +112,14 @@ public final class RatNationsNaturalRefreshSpawner {
             }
 
             RandomSource random = level.random;
-            if (militaryRemaining > 0 && !target.militaryPacks().isEmpty()) {
-                int requested = requestedCount(random, militaryRemaining);
-                for (int i = 0; i < requested; i++) {
-                    spawnMilitary(level, target, chunks, random);
-                }
+            RefreshCounts requested = requestedCounts(random,
+                    militaryRemaining > 0 && !target.militaryPacks().isEmpty() ? militaryRemaining : 0,
+                    civilianRemaining > 0 && target.civilianPackId() != null ? civilianRemaining : 0);
+            for (int i = 0; i < requested.military(); i++) {
+                spawnMilitary(level, target, chunks, random);
             }
-            if (civilianRemaining > 0 && target.civilianPackId() != null) {
-                int requested = requestedCount(random, civilianRemaining);
-                for (int i = 0; i < requested; i++) {
-                    spawnCivilian(level, target, chunks, random);
-                }
+            for (int i = 0; i < requested.civilian(); i++) {
+                spawnCivilian(level, target, chunks, random);
             }
         }
     }
@@ -165,6 +162,15 @@ public final class RatNationsNaturalRefreshSpawner {
             return 0;
         }
         return Math.min(random.nextInt(2) + 1, remainingCapacity);
+    }
+
+    /**
+     * Rolls the military and civilian batch sizes independently. A zero remaining capacity (or
+     * an unavailable pool, as supplied by the caller) consumes no random roll for that pool.
+     */
+    static RefreshCounts requestedCounts(RandomSource random, int militaryRemaining, int civilianRemaining) {
+        return new RefreshCounts(requestedCount(random, militaryRemaining),
+                requestedCount(random, civilianRemaining));
     }
 
     private static int countUnits(ServerLevel level, ResourceLocation nationId,
@@ -351,6 +357,9 @@ public final class RatNationsNaturalRefreshSpawner {
     }
 
     record RoleWeight(String suffix, int weight) {
+    }
+
+    record RefreshCounts(int military, int civilian) {
     }
 
     private record NationTarget(ResourceLocation nationId,
