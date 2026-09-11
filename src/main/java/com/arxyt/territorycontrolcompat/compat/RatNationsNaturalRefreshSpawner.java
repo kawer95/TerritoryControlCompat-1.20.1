@@ -19,14 +19,15 @@ import net.minecraft.core.Direction;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.util.RandomSource;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.tags.BlockTags;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobSpawnType;
 import net.minecraft.world.level.GameRules;
-import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 
@@ -315,7 +316,9 @@ public final class RatNationsNaturalRefreshSpawner {
             if (y <= level.getMinBuildHeight() || y + 2 >= level.getMaxBuildHeight()) {
                 continue;
             }
-            if (!level.hasChunk(x >> 4, z >> 4) || !hasSolidFloor(level, x, y, z)
+            if (!level.hasChunk(x >> 4, z >> 4) || !isSurfaceHeight(level, x, y, z)
+                    || !hasSolidFloor(level, x, y, z)
+                    || (!level.dimensionType().hasCeiling() && !hasOpenSkyAbove(level, x + 1, y + 3, z + 1))
                     || !hasAirVolume(level, x, y, z)) {
                 continue;
             }
@@ -326,6 +329,27 @@ public final class RatNationsNaturalRefreshSpawner {
             }
         }
         return null;
+    }
+
+    private static boolean isSurfaceHeight(ServerLevel level, int x, int y, int z) {
+        for (int dx = 0; dx < 3; dx++) {
+            for (int dz = 0; dz < 3; dz++) {
+                if (level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x + dx, z + dz) != y) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    private static boolean hasOpenSkyAbove(ServerLevel level, int x, int startY, int z) {
+        for (int y = startY; y < level.getMaxBuildHeight(); y++) {
+            var state = level.getBlockState(new BlockPos(x, y, z));
+            if (!state.isAir() && !state.is(BlockTags.LEAVES)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static boolean hasSolidFloor(ServerLevel level, int x, int y, int z) {
