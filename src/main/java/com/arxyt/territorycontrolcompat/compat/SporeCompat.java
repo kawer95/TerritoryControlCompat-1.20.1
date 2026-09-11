@@ -47,6 +47,7 @@ public final class SporeCompat {
     private static final Set<String> FUNGAL_BLOCK_PATHS = Set.of(
             "remains", "rooted_biomass", "biomass_block", "sicken_biomass_block",
             "calcified_biomass_block", "gastric_biomass_block", "fungal_shell", "membrane_block",
+            "freeze_burned_biomass",
             "infested_dirt", "infested_stone", "infested_netherrack", "infested_soul_sand",
             "infested_end_stone", "infested_sand", "infested_gravel", "infested_deepslate",
             "infested_red_sand", "infested_clay", "infested_cobblestone", "infested_cobbled_deepslate",
@@ -61,7 +62,7 @@ public final class SporeCompat {
             "hive_spawn", "biomass_bulb", "bile_lump", "fang_lump", "exploding_lump", "fungal_clamp",
             "drowned_lump", "poisoning_lump", "glowshroom", "hand", "vocals", "lungs", "acidic_sack",
             "outpost_watcher", "organite", "wall_remains", "frozen_remains", "rooted_mycelium",
-            "mycelium_block", "mycelium_slab", "bile", "crusted_bile");
+            "mycelium_block", "mycelium_slab", "bile", "crusted_bile", "acid", "tar");
 
     /**
      * Outputs of FoliageSpread's extra placers, death residue, casing generation, and the
@@ -79,10 +80,10 @@ public final class SporeCompat {
             "poisoning_lump", "glowshroom", "hand", "vocals", "lungs", "acidic_sack",
             "outpost_watcher", "organite", "brain_remnants",
             "rooted_biomass", "biomass_block", "sicken_biomass_block", "calcified_biomass_block",
-            "gastric_biomass_block", "fungal_shell", "membrane_block",
+            "gastric_biomass_block", "fungal_shell", "membrane_block", "freeze_burned_biomass",
             "rotten_log", "rotten_planks", "rotten_stair", "rotten_slab", "rotten_scraps",
             "rotten_branch", "rotten_crops", "rotten_bush", "overgrown_spawner",
-            "bile", "crusted_bile");
+            "bile", "crusted_bile", "acid", "tar");
 
     private SporeCompat() {
     }

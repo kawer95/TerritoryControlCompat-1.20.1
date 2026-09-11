@@ -5,7 +5,7 @@ plugins {
 }
 
 group = 'com.arxyt'
-version = '0.6.0'
+version = '0.7.0'
 
 base { archivesName = 'territorycontrolcompat' }
 
@@ -24,6 +24,15 @@ dependencies {
     // Rat Warlords' release JAR is reobfuscated. Compile against its official-mapping class output
     // so calls through the public faction API remain valid in this ForgeGradle userdev workspace.
     implementation files('../RatNations-1.20.1/build/classes/java/main')
+    // The natural-refresh bridge invokes the public Rat Nations entity configuration methods.
+    // These jars support compilation and the dependency-free verification process; they are not
+    // bundled into the compat artifact because Forge loads the actual mods at runtime.
+    def geckolibDevJar = files('../../versions/国潮红师2/mods/[Marbled的军械库前置]geckolib-forge-1.20.1-4.8.4.jar')
+    def taczDevJar = files('../../versions/国潮红师2/mods/[TACZ枪械]tacz-1.20.1-1.1.8-hotfix.jar')
+    compileOnly geckolibDevJar
+    compileOnly taczDevJar
+    runtimeOnly geckolibDevJar
+    runtimeOnly taczDevJar
 }
 
 tasks.named('jar', Jar).configure {
@@ -48,6 +57,15 @@ tasks.register('verifySporeCompat', JavaExec) {
     mainClass = 'com.arxyt.territorycontrolcompat.compat.SporeCompatVerification'
 }
 
+tasks.register('verifyRatNationsNaturalRefresh', JavaExec) {
+    group = 'verification'
+    description = 'Runs Rat Nations natural-refresh configuration and weighted-pool checks.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.arxyt.territorycontrolcompat.compat.RatNationsNaturalRefreshVerification'
+}
+
 tasks.named('check').configure {
     dependsOn tasks.named('verifySporeCompat')
+    dependsOn tasks.named('verifyRatNationsNaturalRefresh')
 }

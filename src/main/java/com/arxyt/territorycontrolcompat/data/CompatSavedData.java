@@ -35,6 +35,7 @@ public final class CompatSavedData extends SavedData {
         tag.putBoolean("PurgeAbominationsOnLoss", config.purgeAbominationsOnLoss());
         tag.putBoolean("RestrictPrionTerrain", config.restrictPrionTerrain());
         tag.putBoolean("PurgePrionOnLoss", config.purgePrionOnLoss());
+        tag.putBoolean("RatNationsNaturalRefresh", config.ratNationsNaturalRefresh());
         return tag;
     }
 
@@ -57,7 +58,8 @@ public final class CompatSavedData extends SavedData {
                 tag.getBoolean("RestrictAbominationsSpread"),
                 tag.getBoolean("PurgeAbominationsOnLoss"),
                 tag.getBoolean("RestrictPrionTerrain"),
-                tag.getBoolean("PurgePrionOnLoss"));
+                tag.getBoolean("PurgePrionOnLoss"),
+                tag.getBoolean("RatNationsNaturalRefresh"));
         return data;
     }
 
@@ -78,9 +80,10 @@ public final class CompatSavedData extends SavedData {
             boolean restrictAbominationsSpread,
             boolean purgeAbominationsOnLoss,
             boolean restrictPrionTerrain,
-            boolean purgePrionOnLoss) {
+            boolean purgePrionOnLoss,
+            boolean ratNationsNaturalRefresh) {
         public static final Config DEFAULT = new Config(false, false, false, false, false, false, false,
-                false, false, false, false, false, false, false, false, false, false);
+                false, false, false, false, false, false, false, false, false, false, false);
 
         /** Keeps older in-code callers source compatible while new controls default to disabled. */
         public Config(boolean balancedOvaryDensity, boolean restrictCaerula, boolean tideRecession,
@@ -88,7 +91,7 @@ public final class CompatSavedData extends SavedData {
                       boolean phayriosisCure) {
             this(balancedOvaryDensity, restrictCaerula, tideRecession, restrictEyes, eyesCollapse,
                     restrictPhayriosis, phayriosisCure, false, false, false, false, false, false,
-                    false, false, false, false);
+                    false, false, false, false, false);
         }
 
         public Config withBalancedOvaryDensity(boolean value) {
@@ -225,7 +228,15 @@ public final class CompatSavedData extends SavedData {
                     restrictPrionTerrain, value);
         }
 
-        private static Config copy(boolean balancedOvaryDensity, boolean restrictCaerula,
+        public Config withRatNationsNaturalRefresh(boolean value) {
+            return new Config(balancedOvaryDensity, restrictCaerula, tideRecession, restrictEyes, eyesCollapse,
+                    restrictPhayriosis, phayriosisCure, restrictSporeMounds, restrictSporeVigils,
+                    restrictSporeSpawnerStructures, restoreSporeOnLoss, restrictSporeInfectionSpread,
+                    disableSporeUndergroundBias, restrictAbominationsSpread, purgeAbominationsOnLoss,
+                    restrictPrionTerrain, purgePrionOnLoss, value);
+        }
+
+        private Config copy(boolean balancedOvaryDensity, boolean restrictCaerula,
                                    boolean tideRecession, boolean restrictEyes, boolean eyesCollapse,
                                    boolean restrictPhayriosis, boolean phayriosisCure,
                                    boolean restrictSporeMounds, boolean restrictSporeVigils,
@@ -237,7 +248,7 @@ public final class CompatSavedData extends SavedData {
                     restrictPhayriosis, phayriosisCure, restrictSporeMounds, restrictSporeVigils,
                     restrictSporeSpawnerStructures, restoreSporeOnLoss, restrictSporeInfectionSpread,
                     disableSporeUndergroundBias, restrictAbominationsSpread, purgeAbominationsOnLoss,
-                    restrictPrionTerrain, purgePrionOnLoss);
+                    restrictPrionTerrain, purgePrionOnLoss, ratNationsNaturalRefresh);
         }
 
         public Config normalized() { return this; }

@@ -115,6 +115,8 @@ public final class CompatScreen extends Screen {
                 addToggle(contentX, y + ROW_HEIGHT, contentWidth, "失去实控权时清除感染地块", config::purgePrionOnLoss,
                         value -> config = config.withPurgePrionOnLoss(value));
             }
+            case RAT_NATIONS -> addToggle(contentX, y, contentWidth, "自然刷新", config::ratNationsNaturalRefresh,
+                    value -> config = config.withRatNationsNaturalRefresh(value));
         }
     }
 
@@ -153,7 +155,8 @@ public final class CompatScreen extends Screen {
         PHAYRIOSIS("法耶病"),
         SPORE("真菌感染：孢子"),
         ABOMINATIONS("觉悟血肉"),
-        PRION("朊病毒");
+        PRION("朊病毒"),
+        RAT_NATIONS("鼠族诸国");
 
         private final String title;
 

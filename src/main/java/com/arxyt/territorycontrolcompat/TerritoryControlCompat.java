@@ -14,6 +14,7 @@ import com.arxyt.territorycontrolcompat.compat.CustomNpcFactionProvider;
 import com.arxyt.territorycontrolcompat.compat.RatNationsFactionProvider;
 import com.arxyt.territorycontrolcompat.compat.RatNationsDiplomacyResolver;
 import com.arxyt.territorycontrolcompat.compat.RatNationsCivilianControlCompat;
+import com.arxyt.territorycontrolcompat.compat.RatNationsNaturalRefreshSpawner;
 import com.arxyt.territorycontrolcompat.config.RatNationsCivilianConfig;
 import com.arxyt.territorycontrolcompat.network.CompatNetwork;
 import net.minecraftforge.fml.common.Mod;
@@ -51,6 +52,7 @@ public final class TerritoryControlCompat {
                     new net.minecraft.resources.ResourceLocation(MODID, "rat_nations_diplomacy"), 1000,
                     RatNationsDiplomacyResolver::resolve);
             TerritoryControlApi.registerOwnershipChangeListener(RatNationsCivilianControlCompat::onOwnershipChanged);
+            MinecraftForge.EVENT_BUS.register(new RatNationsNaturalRefreshSpawner());
         }
         MinecraftForge.EVENT_BUS.register(new SporeEntitySpawnHandler());
         CompatNetwork.register();

@@ -27,6 +27,7 @@ public final class SporeCompatVerification {
                 "casing-generated bile must be restricted and cleaned");
         require(SporeCompat.isFungalInfectionBlockId(ResourceLocation.fromNamespaceAndPath("spore", "crusted_bile")),
                 "solidified bile must remain restricted and cleaned");
+        verifySporeAutomaticRestorationExemptions();
         require(!SporeCompat.isFungalInfectionBlockId(ResourceLocation.fromNamespaceAndPath("spore", "cdu")),
                 "non-infection Spore machinery must not be cleaned on a territory loss");
         require(!SporeCompat.isFungalInfectionBlockId(ResourceLocation.fromNamespaceAndPath("minecraft", "stone")),
@@ -133,6 +134,26 @@ public final class SporeCompatVerification {
                 "direct stone conversion must remain a reversible conversion");
         require(!SporeCompat.isAirCleanupBlockId(ResourceLocation.fromNamespaceAndPath("spore", "rotten_grass")),
                 "known grass conversion must retain its explicit restoration");
+    }
+
+    /**
+     * These Spore outputs either consume themselves after activation or are temporary biomass
+     * used by infection structures.  CompatBlockPolicy maps every fungal classification to the
+     * Territory Control protection exemption, so a removal here must never be auto-restored.
+     */
+    private static void verifySporeAutomaticRestorationExemptions() {
+        List.of(
+                        // Touch-triggered foliage and traps.
+                        "biomass_lump", "biomass_bulb", "bile_lump", "fang_lump", "exploding_lump",
+                        "fungal_clamp", "drowned_lump", "poisoning_lump", "acid", "tar", "remains",
+                        // Biomass and dome shell variants, including the random-decaying frozen form.
+                        "rooted_biomass", "biomass_block", "sicken_biomass_block",
+                        "calcified_biomass_block", "gastric_biomass_block", "fungal_shell",
+                        "membrane_block", "rooted_mycelium", "mycelium_block", "mycelium_slab",
+                        "freeze_burned_biomass")
+                .forEach(path -> require(SporeCompat.isFungalInfectionBlockId(
+                                ResourceLocation.fromNamespaceAndPath("spore", path)),
+                        path + " must bypass automatic restoration"));
     }
 
     private static void verifyBuiltinCnpcFactionCatalog() {
