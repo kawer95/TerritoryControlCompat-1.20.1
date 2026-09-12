@@ -38,6 +38,18 @@ public final class PrionCompat {
         return id != null && MOD_ID.equals(id.getNamespace()) && "eggs_block".equals(id.getPath());
     }
 
+    static ResourceLocation cleanupReplacementId(ResourceLocation id) {
+        return id != null && MOD_ID.equals(id.getNamespace())
+                && ("root_block".equals(id.getPath()) || "living_block".equals(id.getPath()))
+                ? ResourceLocation.withDefaultNamespace("cobblestone")
+                : ResourceLocation.withDefaultNamespace("air");
+    }
+
+    static Block cleanupReplacement(ResourceLocation id) {
+        Block block = ForgeRegistries.BLOCKS.getValue(cleanupReplacementId(id));
+        return block == null ? Blocks.AIR : block;
+    }
+
     public static boolean isEggLifecycleRemoval(BlockState oldState, BlockState newState) {
         return newState.isAir() && isEggsBlockId(ForgeRegistries.BLOCKS.getKey(oldState.getBlock()));
     }
@@ -57,8 +69,10 @@ public final class PrionCompat {
                 for (int z = chunk.getMinBlockZ(); z <= chunk.getMaxBlockZ(); z++) {
                     for (int y = level.getMinBuildHeight(); y < level.getMaxBuildHeight(); y++) {
                         pos.set(x, y, z);
-                        if (!isTerritoryBlock(level.getBlockState(pos))) continue;
-                        level.setBlock(pos, Blocks.AIR.defaultBlockState(),
+                        BlockState state = level.getBlockState(pos);
+                        if (!isTerritoryBlock(state)) continue;
+                        ResourceLocation id = ForgeRegistries.BLOCKS.getKey(state.getBlock());
+                        level.setBlock(pos, cleanupReplacement(id).defaultBlockState(),
                                 Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
                         data.removeProtectedBlock(level, pos);
                     }

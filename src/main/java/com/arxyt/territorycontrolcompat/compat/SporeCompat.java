@@ -9,6 +9,8 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelAccessor;
@@ -18,6 +20,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraftforge.registries.ForgeRegistries;
 
 import java.util.HashSet;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -85,6 +88,14 @@ public final class SporeCompat {
             "rotten_branch", "rotten_crops", "rotten_bush", "overgrown_spawner",
             "bile", "crusted_bile", "acid", "tar");
 
+    /**
+     * Effects emitted by Spore's traps, infection clouds, infected units, and fungal blocks.
+     * Symbiosis is deliberately excluded because it is Spore's beneficial ally effect.
+     */
+    private static final Set<String> SPORE_DEBUFF_PATHS = Set.of(
+            "mycelium_ef", "madness", "starvation", "uneasy", "ignitable", "marker",
+            "corrosion", "frostbite", "biled");
+
     private SporeCompat() {
     }
 
@@ -118,6 +129,36 @@ public final class SporeCompat {
     public static boolean allowVigilSpawn(ServerLevel level, BlockPos pos) {
         return !CompatSavedData.get(level).config().restrictSporeVigils()
                 || TerritoryControlApi.isOwnedByModFaction(level, pos, MOD_ID);
+    }
+
+    /**
+     * Returns true when the optional Spore friendly-fire control is enabled and the entity is
+     * assigned to the Spore faction or one of its configured allies.  The lookup intentionally
+     * uses Territory Control's canonical entity provider chain, so Custom NPC, Rat Nations, and
+     * other registered providers work without being hard-coded here.
+     */
+    public static boolean shouldProtectFriendlyEntity(Level level, Entity entity) {
+        if (!(level instanceof ServerLevel server) || entity == null || entity.level() != server
+                || !CompatSavedData.get(server).config().protectSporeFriendlyEntities()) {
+            return false;
+        }
+        Optional<String> sporeFaction = TerritoryControlApi.factionIdForMod(server, MOD_ID);
+        Optional<String> entityFaction = TerritoryControlApi.factionIdForEntity(server, entity);
+        return sporeFaction.isPresent() && entityFaction.isPresent()
+                && TerritoryControlApi.areFactionsSameOrAllied(server, sporeFaction.get(), entityFaction.get());
+    }
+
+    /** Used by the global effect event so clouds and projectile effects are covered too. */
+    public static boolean shouldBlockFriendlySporeEffect(LivingEntity entity, MobEffectInstance effect) {
+        if (entity == null || effect == null || !isSporeDebuff(effect)) {
+            return false;
+        }
+        return shouldProtectFriendlyEntity(entity.level(), entity);
+    }
+
+    static boolean isSporeDebuff(MobEffectInstance effect) {
+        ResourceLocation id = effect == null ? null : ForgeRegistries.MOB_EFFECTS.getKey(effect.getEffect());
+        return id != null && MOD_ID.equals(id.getNamespace()) && SPORE_DEBUFF_PATHS.contains(id.getPath());
     }
 
     /** Removes only Proto's low-altitude terrain override; water and air selection remain untouched. */
@@ -165,6 +206,18 @@ public final class SporeCompat {
     public static boolean isFungalInfectionBlock(BlockState state) {
         ResourceLocation id = ForgeRegistries.BLOCKS.getKey(state.getBlock());
         return id != null && isFungalInfectionBlockId(id);
+    }
+
+    /** A fungal-to-fungal replacement is an infection lifecycle update, not new territory placement. */
+    static boolean isFungalLifecycleTransition(BlockState oldState, BlockState newState) {
+        ResourceLocation oldId = ForgeRegistries.BLOCKS.getKey(oldState.getBlock());
+        ResourceLocation newId = ForgeRegistries.BLOCKS.getKey(newState.getBlock());
+        return isFungalLifecycleTransition(oldId, newId);
+    }
+
+    static boolean isFungalLifecycleTransition(ResourceLocation oldId, ResourceLocation newId) {
+        return oldId != null && newId != null && !oldId.equals(newId)
+                && isFungalInfectionBlockId(oldId) && isFungalInfectionBlockId(newId);
     }
 
     static boolean isFungalInfectionBlockId(ResourceLocation id) {

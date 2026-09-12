@@ -9,12 +9,17 @@ import com.arxyt.territorycontrolcompat.compat.PhayriosisCompat;
 import com.arxyt.territorycontrolcompat.compat.SporeCompat;
 import com.arxyt.territorycontrolcompat.compat.PrionCompat;
 import com.arxyt.territorycontrolcompat.compat.SporeEntitySpawnHandler;
+import com.arxyt.territorycontrolcompat.compat.SporeFriendlyEntityHandler;
+import com.arxyt.territorycontrolcompat.compat.SporeCampaignDirector;
+import com.arxyt.territorycontrolcompat.compat.SporeCampaignCommands;
 import com.arxyt.territorycontrolcompat.compat.CompatBlockPolicy;
 import com.arxyt.territorycontrolcompat.compat.CustomNpcFactionProvider;
 import com.arxyt.territorycontrolcompat.compat.RatNationsFactionProvider;
 import com.arxyt.territorycontrolcompat.compat.RatNationsDiplomacyResolver;
 import com.arxyt.territorycontrolcompat.compat.RatNationsCivilianControlCompat;
 import com.arxyt.territorycontrolcompat.compat.RatNationsNaturalRefreshSpawner;
+import com.arxyt.territorycontrolcompat.compat.RatNationsCampaignDirector;
+import com.arxyt.territorycontrolcompat.compat.RatNationsCampaignCommands;
 import com.arxyt.territorycontrolcompat.config.RatNationsCivilianConfig;
 import com.arxyt.territorycontrolcompat.network.CompatNetwork;
 import net.minecraftforge.fml.common.Mod;
@@ -34,6 +39,7 @@ public final class TerritoryControlCompat {
     public TerritoryControlCompat() {
         ModLoadingContext.get().registerConfig(ModConfig.Type.SERVER, RatNationsCivilianConfig.SPEC);
         TerritoryControlApi.registerBlockPlacementGuard(CompatBlockPolicy::allowPlacement);
+        TerritoryControlApi.registerBlockStateUpdateGuard(CompatBlockPolicy::allowStateUpdate);
         TerritoryControlApi.registerBlockProtectionExemption(CompatBlockPolicy::protectionExempt);
         TerritoryControlApi.registerOwnershipChangeListener(CaerulaArborCompat::onOwnershipChanged);
         TerritoryControlApi.registerOwnershipChangeListener(EyesCompat::onOwnershipChanged);
@@ -53,8 +59,15 @@ public final class TerritoryControlCompat {
                     RatNationsDiplomacyResolver::resolve);
             TerritoryControlApi.registerOwnershipChangeListener(RatNationsCivilianControlCompat::onOwnershipChanged);
             MinecraftForge.EVENT_BUS.register(new RatNationsNaturalRefreshSpawner());
+            MinecraftForge.EVENT_BUS.register(new RatNationsCampaignDirector());
+            MinecraftForge.EVENT_BUS.addListener(RatNationsCampaignCommands::register);
         }
         MinecraftForge.EVENT_BUS.register(new SporeEntitySpawnHandler());
+        MinecraftForge.EVENT_BUS.register(new SporeFriendlyEntityHandler());
+        if (ModList.get().isLoaded(SporeCampaignDirector.MOD_ID)) {
+            MinecraftForge.EVENT_BUS.register(new SporeCampaignDirector());
+            MinecraftForge.EVENT_BUS.addListener(SporeCampaignCommands::register);
+        }
         CompatNetwork.register();
         FMLJavaModLoadingContext.get().getModEventBus().addListener(this::commonSetup);
         DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> com.arxyt.territorycontrolcompat.client.CompatClientEvents::registerPage);

@@ -5,6 +5,7 @@ import com.arxyt.territorycontrolcompat.network.CompatNetwork;
 import com.arxyt.territorycontrolcompat.network.SaveCompatPacket;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 
@@ -23,6 +24,12 @@ public final class CompatScreen extends Screen {
     private int top;
     private int panelWidth;
     private int footerY;
+    private EditBox ratVictoryCooldownBox;
+    private EditBox ratFailureCooldownBox;
+    private EditBox sporeVictoryCooldownBox;
+    private EditBox sporeFailureCooldownBox;
+    private EditBox sporeGrandVictoryCooldownBox;
+    private EditBox sporeGrandFailureCooldownBox;
 
     public CompatScreen(Screen parent, CompatSavedData.Config config) {
         super(Component.literal("模组适配"));
@@ -32,6 +39,12 @@ public final class CompatScreen extends Screen {
 
     @Override
     protected void init() {
+        ratVictoryCooldownBox = null;
+        ratFailureCooldownBox = null;
+        sporeVictoryCooldownBox = null;
+        sporeFailureCooldownBox = null;
+        sporeGrandVictoryCooldownBox = null;
+        sporeGrandFailureCooldownBox = null;
         panelWidth = Math.min(PANEL_MAX_WIDTH, Math.max(360, width - 28));
         left = (width - panelWidth) / 2;
         top = 30;
@@ -50,6 +63,7 @@ public final class CompatScreen extends Screen {
 
         addSettings();
         addRenderableWidget(Button.builder(Component.translatable("screen.territorycontrol.save"), button -> {
+                    applyCampaignInputs();
                     CompatNetwork.CHANNEL.sendToServer(new SaveCompatPacket(config));
                 })
                 .bounds(left + 8, footerY, 78, 20)
@@ -100,8 +114,26 @@ public final class CompatScreen extends Screen {
                         value -> config = config.withRestoreSporeOnLoss(value));
                 addToggle(contentX, y + ROW_HEIGHT * 4, contentWidth, "侵蚀只能向实控区扩散", config::restrictSporeInfectionSpread,
                         value -> config = config.withRestrictSporeInfectionSpread(value));
-                addToggle(contentX, y + ROW_HEIGHT * 5, contentWidth, "取消地下掘食者偏置", config::disableSporeUndergroundBias,
+                addToggle(contentX, y + ROW_HEIGHT * 5, contentWidth, "友军不触发真菌陷阱与感染", config::protectSporeFriendlyEntities,
+                        value -> config = config.withProtectSporeFriendlyEntities(value));
+                addToggle(contentX, y + ROW_HEIGHT * 6, contentWidth, "取消地下掘食者偏置", config::disableSporeUndergroundBias,
                         value -> config = config.withDisableSporeUndergroundBias(value));
+                addToggle(contentX, y + ROW_HEIGHT * 7, contentWidth, "发起常规蜂群战役", config::sporeRegularCampaigns,
+                        value -> config = config.withSporeRegularCampaigns(value));
+                addToggle(contentX, y + ROW_HEIGHT * 8, contentWidth, "发起大型灾厄远征", config::sporeGrandCampaigns,
+                        value -> config = config.withSporeGrandCampaigns(value));
+                addToggle(contentX, y + ROW_HEIGHT * 9, contentWidth, "战役使用原生气味增援", config::sporeCampaignScentReinforcements,
+                        value -> config = config.withSporeCampaignScentReinforcements(value));
+                addToggle(contentX, y + ROW_HEIGHT * 10, contentWidth, "占稳后建立原生菌丘", config::sporeCampaignMoundEstablishment,
+                        value -> config = config.withSporeCampaignMoundEstablishment(value));
+                sporeVictoryCooldownBox = cooldownBox(contentX + 118, y + ROW_HEIGHT * 11, 48,
+                        config.sporeCampaignVictoryCooldownMinutes(), "常规胜利冷却");
+                sporeFailureCooldownBox = cooldownBox(contentX + 272, y + ROW_HEIGHT * 11, 48,
+                        config.sporeCampaignFailureCooldownMinutes(), "常规失败冷却");
+                sporeGrandVictoryCooldownBox = cooldownBox(contentX + 118, y + ROW_HEIGHT * 12, 48,
+                        config.sporeGrandCampaignVictoryCooldownMinutes(), "大型胜利冷却");
+                sporeGrandFailureCooldownBox = cooldownBox(contentX + 272, y + ROW_HEIGHT * 12, 48,
+                        config.sporeGrandCampaignFailureCooldownMinutes(), "大型失败冷却");
             }
             case ABOMINATIONS -> {
                 addToggle(contentX, y, contentWidth, "只能在占领区扩散", config::restrictAbominationsSpread,
@@ -115,9 +147,45 @@ public final class CompatScreen extends Screen {
                 addToggle(contentX, y + ROW_HEIGHT, contentWidth, "失去实控权时清除感染地块", config::purgePrionOnLoss,
                         value -> config = config.withPurgePrionOnLoss(value));
             }
-            case RAT_NATIONS -> addToggle(contentX, y, contentWidth, "自然刷新", config::ratNationsNaturalRefresh,
-                    value -> config = config.withRatNationsNaturalRefresh(value));
+            case RAT_NATIONS -> {
+                addToggle(contentX, y, contentWidth, "自然刷新", config::ratNationsNaturalRefresh,
+                        value -> config = config.withRatNationsNaturalRefresh(value));
+                addToggle(contentX, y + ROW_HEIGHT, contentWidth, "发起战役", config::ratNationsCampaigns,
+                        value -> config = config.withRatNationsCampaigns(value));
+                ratVictoryCooldownBox = cooldownBox(contentX + 170, y + ROW_HEIGHT * 2,
+                        contentWidth - 170, config.ratNationsVictoryCooldownMinutes(), "胜利冷却（分钟）");
+                ratFailureCooldownBox = cooldownBox(contentX + 170, y + ROW_HEIGHT * 3,
+                        contentWidth - 170, config.ratNationsFailureCooldownMinutes(), "失败冷却（分钟）");
+            }
         }
+    }
+
+    private EditBox cooldownBox(int x, int y, int width, int value, String label) {
+        EditBox box = new EditBox(font, x, y, Math.max(72, width), 20, Component.literal(label));
+        box.setValue(Integer.toString(value));
+        box.setFilter(raw -> raw.isEmpty() || raw.matches("[0-9]{0,4}"));
+        addRenderableWidget(box);
+        return box;
+    }
+
+    private void applyCampaignInputs() {
+        if (ratVictoryCooldownBox != null) config = config.withRatNationsVictoryCooldownMinutes(parseMinutes(
+                ratVictoryCooldownBox.getValue(), config.ratNationsVictoryCooldownMinutes()));
+        if (ratFailureCooldownBox != null) config = config.withRatNationsFailureCooldownMinutes(parseMinutes(
+                ratFailureCooldownBox.getValue(), config.ratNationsFailureCooldownMinutes()));
+        if (sporeVictoryCooldownBox != null) config = config.withSporeCampaignVictoryCooldownMinutes(parseMinutes(
+                sporeVictoryCooldownBox.getValue(), config.sporeCampaignVictoryCooldownMinutes()));
+        if (sporeFailureCooldownBox != null) config = config.withSporeCampaignFailureCooldownMinutes(parseMinutes(
+                sporeFailureCooldownBox.getValue(), config.sporeCampaignFailureCooldownMinutes()));
+        if (sporeGrandVictoryCooldownBox != null) config = config.withSporeGrandCampaignVictoryCooldownMinutes(parseMinutes(
+                sporeGrandVictoryCooldownBox.getValue(), config.sporeGrandCampaignVictoryCooldownMinutes()));
+        if (sporeGrandFailureCooldownBox != null) config = config.withSporeGrandCampaignFailureCooldownMinutes(parseMinutes(
+                sporeGrandFailureCooldownBox.getValue(), config.sporeGrandCampaignFailureCooldownMinutes()));
+    }
+
+    private static int parseMinutes(String raw, int fallback) {
+        try { return Integer.parseInt(raw); }
+        catch (NumberFormatException ignored) { return fallback; }
     }
 
     private void addToggle(int x, int y, int buttonWidth, String label, BooleanSupplier value, Consumer<Boolean> setter) {
@@ -141,6 +209,20 @@ public final class CompatScreen extends Screen {
         graphics.fill(left, footerY - 6, left + panelWidth, footerY - 5, 0xFF555555);
         graphics.drawString(font, title, left + 8, top + 8, 0xFFFFFF, false);
         graphics.drawString(font, Component.literal(selected.title), left + NAV_WIDTH + 14, top + 29, 0xFFFFFF, false);
+        if (selected == Section.RAT_NATIONS) {
+            int x = left + NAV_WIDTH + 14;
+            int y = top + 42;
+            graphics.drawString(font, "胜利冷却（分钟）", x, y + ROW_HEIGHT * 2 + 6, 0xD8D8D8, false);
+            graphics.drawString(font, "失败冷却（分钟）", x, y + ROW_HEIGHT * 3 + 6, 0xD8D8D8, false);
+        }
+        if (selected == Section.SPORE) {
+            int x = left + NAV_WIDTH + 14;
+            int y = top + 42;
+            graphics.drawString(font, "常规 胜/败（分钟）", x, y + ROW_HEIGHT * 11 + 6, 0xD8D8D8, false);
+            graphics.drawString(font, "大型 胜/败（分钟）", x, y + ROW_HEIGHT * 12 + 6, 0xD8D8D8, false);
+            graphics.drawString(font, "/", x + 244, y + ROW_HEIGHT * 11 + 6, 0xD8D8D8, false);
+            graphics.drawString(font, "/", x + 244, y + ROW_HEIGHT * 12 + 6, 0xD8D8D8, false);
+        }
         super.render(graphics, mouseX, mouseY, partialTick);
     }
 

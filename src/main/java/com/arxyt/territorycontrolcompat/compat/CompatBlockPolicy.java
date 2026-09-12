@@ -79,6 +79,16 @@ public final class CompatBlockPolicy {
                 || PrionCompat.isEggLifecycleRemoval(oldState, newState);
     }
 
+    /**
+     * Allows Spore's infection-family lifecycle replacements (for example
+     * {@code bloomfung2 -> blomfung}) without allowing an ordinary block to become fungal
+     * outside its territory.  Damage protection still evaluates the same mutation afterwards.
+     */
+    public static boolean allowStateUpdate(LevelAccessor level, BlockPos pos,
+                                           BlockState oldState, BlockState newState) {
+        return SporeCompat.isFungalLifecycleTransition(oldState, newState);
+    }
+
     static int policy(Block block) {
         Reference2IntOpenHashMap<Block> snapshot = policies;
         if (snapshot == null) {

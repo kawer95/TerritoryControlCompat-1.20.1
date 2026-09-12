@@ -5,7 +5,7 @@ plugins {
 }
 
 group = 'com.arxyt'
-version = '0.7.0'
+version = '0.8.0'
 
 base { archivesName = 'territorycontrolcompat' }
 
@@ -20,7 +20,7 @@ repositories { mavenCentral() }
 
 dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
-    implementation fg.deobf(files('../TerritoryControl-1.20.1/build/libs/territorycontrol-0.10.16.jar'))
+    implementation fg.deobf(files('../TerritoryControl-1.20.1/build/libs/territorycontrol-0.10.25.jar'))
     // Rat Warlords' release JAR is reobfuscated. Compile against its official-mapping class output
     // so calls through the public faction API remain valid in this ForgeGradle userdev workspace.
     implementation files('../RatNations-1.20.1/build/classes/java/main')
@@ -29,8 +29,12 @@ dependencies {
     // bundled into the compat artifact because Forge loads the actual mods at runtime.
     def geckolibDevJar = files('../../versions/国潮红师2/mods/[Marbled的军械库前置]geckolib-forge-1.20.1-4.8.4.jar')
     def taczDevJar = files('../../versions/国潮红师2/mods/[TACZ枪械]tacz-1.20.1-1.1.8-hotfix.jar')
+    def sporeDevJar = files('../../versions/国潮红师2/mods/[真菌感染：孢子]spore_1.20.1_2.2.0j.jar')
     compileOnly geckolibDevJar
     compileOnly taczDevJar
+    // Spore is distributed as a reobfuscated local mod JAR. Its public entity APIs are used
+    // only for compilation; the runtime installation supplies the actual mod.
+    compileOnly sporeDevJar
     runtimeOnly geckolibDevJar
     runtimeOnly taczDevJar
 }

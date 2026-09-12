@@ -18,7 +18,11 @@
     "PhayriosisEntityJoinBiomeMixin",
     "GastgaberBuilderStructureMixin",
     "SporeScentSummonMixin",
-    "SporeProtoTerrainMixin"
+    "SporeProtoTerrainMixin",
+    "SporeTriggerBlockMixin",
+    "SporeSickenBiomassMixin",
+    "SporeCorrosiveDrownedLumpMixin",
+    "SporeCalamityCampaignMoundMixin"
   ],
   "injectors": { "defaultRequire": 1 }
 }

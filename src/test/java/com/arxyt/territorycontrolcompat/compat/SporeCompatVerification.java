@@ -6,8 +6,10 @@ import com.arxyt.territorycontrolcompat.network.CompatConfigPacket;
 import io.netty.buffer.Unpooled;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.core.BlockPos;
 
 import java.util.List;
+import java.util.UUID;
 
 /** Small dependency-free verification entry point for the infection-block classifier. */
 public final class SporeCompatVerification {
@@ -23,6 +25,14 @@ public final class SporeCompatVerification {
                 "sculk conversion output must be restricted and cleaned");
         require(SporeCompat.isFungalInfectionBlockId(ResourceLocation.fromNamespaceAndPath("minecraft", "mycelium")),
                 "Spore's grass-to-mycelium conversion must be restricted and cleaned");
+        require(SporeCompat.isFungalLifecycleTransition(
+                        ResourceLocation.fromNamespaceAndPath("spore", "bloomfung2"),
+                        ResourceLocation.fromNamespaceAndPath("spore", "blomfung")),
+                "touch-triggered bloomed mycelium must be allowed to transform once");
+        require(!SporeCompat.isFungalLifecycleTransition(
+                        ResourceLocation.fromNamespaceAndPath("minecraft", "stone"),
+                        ResourceLocation.fromNamespaceAndPath("spore", "blomfung")),
+                "ordinary terrain must not gain a fungal lifecycle bypass");
         require(SporeCompat.isFungalInfectionBlockId(ResourceLocation.fromNamespaceAndPath("spore", "bile")),
                 "casing-generated bile must be restricted and cleaned");
         require(SporeCompat.isFungalInfectionBlockId(ResourceLocation.fromNamespaceAndPath("spore", "crusted_bile")),
@@ -38,6 +48,8 @@ public final class SporeCompatVerification {
         verifyAbominationsInfectionClassification();
         verifyPrionClassification();
         verifyCompatConfigPacketRoundTrip();
+        verifySporeCampaignPersistence();
+        verifyCampaignTerrainPolicy();
         verifyBuiltinCnpcFactionCatalog();
         verifyRatNationsFactionCatalog();
     }
@@ -45,13 +57,61 @@ public final class SporeCompatVerification {
     private static void verifyCompatConfigPacketRoundTrip() {
         CompatSavedData.Config expected = CompatSavedData.Config.DEFAULT
                 .withRestrictPrionTerrain(true)
-                .withPurgePrionOnLoss(true);
+                .withPurgePrionOnLoss(true)
+                .withProtectSporeFriendlyEntities(true)
+                .withSporeRegularCampaigns(true)
+                .withSporeGrandCampaigns(true)
+                .withSporeCampaignScentReinforcements(false)
+                .withSporeCampaignMoundEstablishment(false)
+                .withSporeCampaignVictoryCooldownMinutes(17)
+                .withSporeCampaignFailureCooldownMinutes(4)
+                .withSporeGrandCampaignVictoryCooldownMinutes(31)
+                .withSporeGrandCampaignFailureCooldownMinutes(16);
         FriendlyByteBuf buffer = new FriendlyByteBuf(Unpooled.buffer());
         new CompatConfigPacket(expected, true).encode(buffer);
         CompatConfigPacket decoded = CompatConfigPacket.decode(buffer);
         require(decoded.open() && decoded.config().equals(expected),
-                "compat config network order must preserve the Prion controls");
+                "compat config network order must preserve the Prion, friendly-unit, and campaign controls");
         buffer.release();
+    }
+
+    private static void verifySporeCampaignPersistence() {
+        require(CampaignTerrainResolver.twoThirds(8) == 6, "eight members require six reachable paths");
+        require(CampaignTerrainResolver.twoThirds(12) == 8, "twelve members require eight reachable paths");
+        SporeCampaignSavedData.Key key = new SporeCampaignSavedData.Key("minecraft:overworld", SporeCampaignSavedData.Type.GRAND);
+        UUID infectedId = UUID.randomUUID();
+        UUID calamityId = UUID.randomUUID();
+        SporeCampaignSavedData.Campaign campaign = new SporeCampaignSavedData.Campaign(UUID.randomUUID(), key,
+                0, 0, 4, 4, new BlockPos(8, 64, 8), new BlockPos(-8, 64, -8),
+                List.of(new SporeCampaignSavedData.InfectedMember(infectedId, false, null, new BlockPos(24, 64, 24))),
+                List.of(new SporeCampaignSavedData.CalamityMember(calamityId, BlockPos.ZERO, new BlockPos(24, 64, 24), false, false)),
+                SporeCampaignSavedData.Phase.MUSTER, 12_000L, 4_000L);
+        campaign.setMoundAnchor(new BlockPos(25, 64, 25));
+        campaign.setScentId(UUID.randomUUID());
+        SporeCampaignSavedData.Campaign loaded = SporeCampaignSavedData.Campaign.load(campaign.save());
+        require(loaded != null && loaded.type() == SporeCampaignSavedData.Type.GRAND && loaded.phase() == SporeCampaignSavedData.Phase.MUSTER,
+                "Spore campaign type and phase must survive NBT round-trip");
+        require(loaded.members().size() == 1 && loaded.members().get(0).id().equals(infectedId)
+                        && !loaded.members().get(0).originalLinked() && loaded.members().get(0).originalSearch() == null,
+                "Spore member route snapshot must preserve the original linked and search state");
+        require(loaded.calamities().size() == 1 && loaded.calamities().get(0).id().equals(calamityId)
+                        && loaded.moundAnchor().equals(new BlockPos(25, 64, 25)),
+                "Calamity and post-capture mound state must survive NBT round-trip");
+        CompatSavedData.Config legacy = CompatSavedData.load(new net.minecraft.nbt.CompoundTag()).config();
+        require(!legacy.sporeRegularCampaigns() && !legacy.sporeGrandCampaigns()
+                        && legacy.sporeCampaignScentReinforcements() && legacy.sporeCampaignMoundEstablishment(),
+                "old worlds must leave new campaigns disabled while retaining their safe reinforcement defaults");
+    }
+
+    private static void verifyCampaignTerrainPolicy() {
+        require(CampaignTerrainResolver.hasDryColumn(false, false, false, true, true),
+                "solid dry ground with two air blocks must be a valid land anchor candidate");
+        require(!CampaignTerrainResolver.hasDryColumn(true, false, false, true, true),
+                "water surfaces must never become campaign anchors");
+        require(!CampaignTerrainResolver.hasDryColumn(false, true, false, true, true),
+                "lava surfaces must never become campaign anchors");
+        require(!CampaignTerrainResolver.hasDryColumn(false, false, false, false, true),
+                "submerged objectives must never become campaign anchors");
     }
 
     private static void verifyPrionClassification() {
@@ -68,6 +128,18 @@ public final class SporeCompatVerification {
         require(!PrionCompat.isTerritoryBlockId(
                         ResourceLocation.fromNamespaceAndPath("minecraft", "rooted_dirt")),
                 "vanilla terrain must not be treated as Prion terrain");
+        require(PrionCompat.cleanupReplacementId(
+                        ResourceLocation.fromNamespaceAndPath("prionmod", "living_block"))
+                        .equals(ResourceLocation.withDefaultNamespace("cobblestone")),
+                "lost Prion living block terrain must become cobblestone");
+        require(PrionCompat.cleanupReplacementId(
+                        ResourceLocation.fromNamespaceAndPath("prionmod", "root_block"))
+                        .equals(ResourceLocation.withDefaultNamespace("cobblestone")),
+                "lost Prion root block terrain must become cobblestone");
+        require(PrionCompat.cleanupReplacementId(
+                        ResourceLocation.fromNamespaceAndPath("prionmod", "eggs_block"))
+                        .equals(ResourceLocation.withDefaultNamespace("air")),
+                "temporary Prion egg blocks must remain air cleanup");
     }
 
     private static void verifyAbominationsInfectionClassification() {

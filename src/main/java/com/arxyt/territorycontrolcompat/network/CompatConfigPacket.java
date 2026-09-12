@@ -29,6 +29,18 @@ public record CompatConfigPacket(CompatSavedData.Config config, boolean open) {
         buffer.writeBoolean(config.restrictPrionTerrain());
         buffer.writeBoolean(config.purgePrionOnLoss());
         buffer.writeBoolean(config.ratNationsNaturalRefresh());
+        buffer.writeBoolean(config.protectSporeFriendlyEntities());
+        buffer.writeBoolean(config.ratNationsCampaigns());
+        buffer.writeVarInt(config.ratNationsVictoryCooldownMinutes());
+        buffer.writeVarInt(config.ratNationsFailureCooldownMinutes());
+        buffer.writeBoolean(config.sporeRegularCampaigns());
+        buffer.writeBoolean(config.sporeGrandCampaigns());
+        buffer.writeBoolean(config.sporeCampaignScentReinforcements());
+        buffer.writeBoolean(config.sporeCampaignMoundEstablishment());
+        buffer.writeVarInt(config.sporeCampaignVictoryCooldownMinutes());
+        buffer.writeVarInt(config.sporeCampaignFailureCooldownMinutes());
+        buffer.writeVarInt(config.sporeGrandCampaignVictoryCooldownMinutes());
+        buffer.writeVarInt(config.sporeGrandCampaignFailureCooldownMinutes());
         buffer.writeBoolean(open);
     }
 
@@ -39,7 +51,10 @@ public record CompatConfigPacket(CompatSavedData.Config config, boolean open) {
                 buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean(),
                 buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean(),
                 buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean(),
-                buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean());
+                buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean(),
+                buffer.readBoolean(), buffer.readBoolean(), buffer.readVarInt(), buffer.readVarInt(),
+                buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean(),
+                buffer.readVarInt(), buffer.readVarInt(), buffer.readVarInt(), buffer.readVarInt());
         return new CompatConfigPacket(config, buffer.readBoolean());
     }
 
