@@ -1,9 +1,6 @@
 package com.arxyt.territorycontrolcompat.compat;
 
 import com.arxyt.territorycontrol.api.TerritoryControlApi;
-import com.arxyt.territorycontrol.core.data.Faction;
-import com.arxyt.territorycontrol.core.data.TerritorySavedData;
-import com.arxyt.territorycontrol.core.protection.BlockDamageProtection;
 import com.arxyt.territorycontrolcompat.data.CompatSavedData;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
@@ -11,7 +8,6 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.effect.MobEffectInstance;
-import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.block.Block;
@@ -19,7 +15,6 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraftforge.registries.ForgeRegistries;
 
-import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
 
@@ -230,51 +225,14 @@ public final class SporeCompat {
         return id != null && MOD_ID.equals(id.getNamespace()) && OVERGROWN_SPAWNER_PATH.equals(id.getPath());
     }
 
-    /** Cleans infection-tagged residues after a chunk changes from the Spore faction to another faction. */
-    public static void onOwnershipChanged(ServerLevel level, ChunkPos chunk, Faction previous, Faction current) {
-        if (previous == null || current == null || !previous.ownsMod(MOD_ID) || current.ownsMod(MOD_ID)
-                || !CompatSavedData.get(level).config().restoreSporeOnLoss()) {
-            return;
-        }
-
-        cleanseLostTerritory(level, chunk);
-        // Spore can enqueue a final placement while ownership is changing. Recheck after that work runs.
-        level.getServer().execute(() -> {
-            if (CompatSavedData.get(level).config().restoreSporeOnLoss()
-                    && !TerritoryControlApi.isOwnedByModFaction(
-                    level, chunk.getMiddleBlockPosition(level.getMinBuildHeight()), MOD_ID)) {
-                cleanseLostTerritory(level, chunk);
-            }
-        });
-    }
-
-    private static void cleanseLostTerritory(ServerLevel level, ChunkPos chunk) {
-        if (!level.hasChunk(chunk.x, chunk.z)) {
-            return;
-        }
-
-        TerritorySavedData data = TerritorySavedData.get(level);
-        Set<String> affectedBlockIds = new HashSet<>();
-        FUNGAL_BLOCK_PATHS.forEach(path -> affectedBlockIds.add(MOD_ID + ":" + path));
-        affectedBlockIds.add(VANILLA_NAMESPACE + ":" + MYCELIUM_PATH);
-        data.removeProtectedBlocksInChunk(level, chunk, affectedBlockIds);
-
-        BlockDamageProtection.runUntracked(() -> {
-            for (int x = chunk.getMinBlockX(); x < chunk.getMinBlockX() + 16; x++) {
-                for (int z = chunk.getMinBlockZ(); z < chunk.getMinBlockZ() + 16; z++) {
-                    for (int y = level.getMinBuildHeight(); y < level.getMaxBuildHeight(); y++) {
-                        BlockPos pos = new BlockPos(x, y, z);
-                        BlockState state = level.getBlockState(pos);
-                        ResourceLocation id = ForgeRegistries.BLOCKS.getKey(state.getBlock());
-                        if (id == null || !isFungalInfectionBlockId(id)) {
-                            continue;
-                        }
-                        level.setBlock(pos, restorationFor(id), Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
-                        data.removeProtectedBlock(level, pos);
-                    }
-                }
-            }
-        });
+    /** Registers Spore's terrain table; the core owns owner-transition timing and cleanup scans. */
+    public static TerritoryControlApi.TerrainCleanupProfile terrainCleanupProfile() {
+        return new TerritoryControlApi.TerrainCleanupProfile(MOD_ID,
+                level -> CompatSavedData.get(level).config().restoreSporeOnLoss(),
+                (level, pos, state) -> {
+                    ResourceLocation id = ForgeRegistries.BLOCKS.getKey(state.getBlock());
+                    return isFungalInfectionBlockId(id) ? restorationFor(id) : null;
+                });
     }
 
     /**

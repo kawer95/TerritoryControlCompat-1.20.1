@@ -9,16 +9,19 @@ import com.arxyt.territorycontrol.api.TerritoryControlApi;
 import com.arxyt.territorycontrol.core.BattleModes;
 import com.arxyt.territorycontrol.core.data.Warzone;
 import com.arxyt.territorycontrolcompat.data.CompatSavedData;
+import com.mojang.logging.LogUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.Mob;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.phys.AABB;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
+import org.slf4j.Logger;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -33,6 +36,7 @@ import java.util.UUID;
 /** Drives territory-aware Spore offensives using the mod's own linked-hive, Scent, and Calamity AI. */
 public final class SporeCampaignDirector {
     public static final String MOD_ID = "spore";
+    private static final Logger LOGGER = LogUtils.getLogger();
     private static final int REGULAR_MIN = 8;
     private static final int REGULAR_MAX = 16;
     private static final int GRAND_MIN = 12;
@@ -41,9 +45,9 @@ public final class SporeCampaignDirector {
     private static final long PLAN_RETRY_TICKS = 1_200L;
     private static final long MUSTER_TIMEOUT_TICKS = 1_200L;
     private static final long STABILIZE_TICKS = 600L;
-    private static final long RETREAT_TIMEOUT_TICKS = 1_800L;
     private static final long MOUND_TIMEOUT_TICKS = 1_200L;
     private static final Map<SporeCampaignSavedData.Key, Long> NEXT_PLAN_ATTEMPT = new HashMap<>();
+    private static final Map<CampaignPlanningService.JobKey, ProbeSequence> PROBE_SEQUENCES = new HashMap<>();
     private static long planningAttempts, candidateWarzones, pathProbes, campaignsStarted, campaignsCompleted, campaignsFailed, pauses;
 
     @SubscribeEvent
@@ -52,10 +56,23 @@ public final class SporeCampaignDirector {
         MinecraftServer server = event.getServer();
         CompatSavedData.Config config = CompatSavedData.get(server.overworld()).config();
         if (!config.sporeRegularCampaigns() && !config.sporeGrandCampaigns()) {
-            for (ServerLevel level : server.getAllLevels()) abortAll(level);
+            CampaignPlanningService.cancelDirector("spore");
+            CampaignRouteProbeService.cancelDirector("spore");
+            CampaignRallyPlacementService.cancelDirector("spore");
+            PROBE_SEQUENCES.clear();
+            for (ServerLevel level : server.getAllLevels()) { abortAll(level); CampaignDeploymentService.rollback(level, "SPORE_"); }
             return;
         }
-        if (BattleModes.isLayoutMode(server) || BattleModes.isCleanupMode(server)) return;
+        if (BattleModes.isLayoutMode(server) || BattleModes.isCleanupMode(server)) {
+            PROBE_SEQUENCES.clear();
+            for (ServerLevel level : server.getAllLevels()) {
+                CampaignPlanningService.cancelDimension(level.dimension().location().toString());
+                CampaignRouteProbeService.cancelDimension(level.dimension().location().toString());
+                CampaignRallyPlacementService.cancelDimension(level.dimension().location().toString());
+                CampaignDeploymentService.rollback(level, "");
+            }
+            return;
+        }
         for (ServerLevel level : server.getAllLevels()) tickLevel(level, config);
     }
 
@@ -64,66 +81,101 @@ public final class SporeCampaignDirector {
         SporeCampaignSavedData data = SporeCampaignSavedData.get(level);
         if (!config.sporeRegularCampaigns()) abort(level, SporeCampaignSavedData.Type.REGULAR, false, "常规战役已关闭");
         if (!config.sporeGrandCampaigns()) abort(level, SporeCampaignSavedData.Type.GRAND, false, "大型远征已关闭");
-        if (players.isEmpty()) return;
+        if (players.isEmpty()) {
+            return;
+        }
 
         long now = level.getGameTime();
-        Map<ChunkPos, TerritoryControlApi.TerritoryView> visible = visibleTerritories(level, players);
-        for (SporeCampaignSavedData.Campaign campaign : data.campaigns(level)) tickCampaign(level, players, visible, data, campaign, now, config);
-        if (config.sporeRegularCampaigns()) prepare(level, visible, data, SporeCampaignSavedData.Type.REGULAR, now, config);
-        if (config.sporeGrandCampaigns()) prepare(level, visible, data, SporeCampaignSavedData.Type.GRAND, now, config);
+        CampaignWorldSnapshotCache.PlanningSnapshot snapshot = CampaignWorldSnapshotCache.planningSnapshot(level);
+        for (SporeCampaignSavedData.Campaign campaign : data.campaigns(level)) tickCampaign(level, players, data, campaign, now, config);
+        if (snapshot == null) return;
+        if (config.sporeRegularCampaigns()) prepareAsync(level, data, SporeCampaignSavedData.Type.REGULAR, now, snapshot);
+        if (config.sporeGrandCampaigns()) prepareAsync(level, data, SporeCampaignSavedData.Type.GRAND, now, snapshot);
     }
 
     private static void tickCampaign(ServerLevel level, List<ServerPlayer> players,
-                                     Map<ChunkPos, TerritoryControlApi.TerritoryView> visible,
                                      SporeCampaignSavedData data, SporeCampaignSavedData.Campaign campaign,
                                      long now, CompatSavedData.Config config) {
         List<Infected> members = members(level, campaign);
         List<Calamity> calamities = calamities(level, campaign);
         if (!isOperational(level, players, campaign)) {
-            if (!campaign.paused()) { campaign.setPaused(true); pauses++; data.markChanged(); }
+            if (!campaign.paused()) {
+                campaign.setPaused(true);
+                pauses++;
+                data.markChanged();
+                logCampaign(level, campaign, "PAUSED", "战区或目标区块不在玩家加载范围内，或集结点失效");
+            }
             return;
         }
-        if (campaign.paused()) { campaign.setPaused(false); data.markChanged(); }
-        int minimum = campaign.type() == SporeCampaignSavedData.Type.REGULAR ? REGULAR_MIN : GRAND_MIN;
-        if (campaign.phase() != SporeCampaignSavedData.Phase.RETREAT && members.size() < minimum) {
-            beginRetreat(level, data, campaign, members, calamities, now, "护卫兵力不足");
+        if (campaign.paused()) {
+            campaign.setPaused(false);
+            data.markChanged();
+            logCampaign(level, campaign, "RESUMED", "战区和目标区块重新可用");
+        }
+        if (members.isEmpty()) {
+            finish(level, data, campaign, members, calamities, now, false, "战役成员全部失联或阵亡");
             return;
         }
-        if (campaign.type() == SporeCampaignSavedData.Type.GRAND && campaign.phase() != SporeCampaignSavedData.Phase.RETREAT
-                && calamities.isEmpty()) {
-            beginRetreat(level, data, campaign, members, calamities, now, "灾厄单位失联");
-            return;
+        if (campaign.phase() == SporeCampaignSavedData.Phase.RETREAT) {
+            SporeCampaignSavedData.Phase resumed = members.stream().anyMatch(member -> campaign.contains(member.chunkPosition()))
+                    ? SporeCampaignSavedData.Phase.OCCUPY : SporeCampaignSavedData.Phase.ADVANCE;
+            transition(level, campaign, resumed, now, "撤退功能已关闭，恢复进攻");
+            data.markChanged();
         }
 
         switch (campaign.phase()) {
             case MUSTER -> {
-                if (now >= campaign.launchAt() && mustered(campaign, members)) campaign.setPhase(SporeCampaignSavedData.Phase.ADVANCE, now);
-                else if (now >= campaign.launchAt() && now - Math.max(campaign.phaseSince(), campaign.launchAt()) > MUSTER_TIMEOUT_TICKS) {
-                    beginRetreat(level, data, campaign, members, calamities, now, "集结超时");
+                if (now >= campaign.launchAt() && targetState(level, campaign) != CampaignTerritoryConditions.TargetState.ACTIVE) {
+                    finish(level, data, campaign, members, calamities, now, true,
+                            "目标战区已完成或剩余区块不可达");
                     return;
+                }
+                if (now >= campaign.launchAt() && mustered(campaign, members)) {
+                    transition(level, campaign, SporeCampaignSavedData.Phase.ADVANCE, now, "至少 75% 护卫抵达集结点");
+                }
+                else if (now >= campaign.launchAt() && now - Math.max(campaign.phaseSince(), campaign.launchAt()) > MUSTER_TIMEOUT_TICKS) {
+                    transition(level, campaign, SporeCampaignSavedData.Phase.ADVANCE, now,
+                            "撤退已关闭，集结超时后直接进攻");
                 }
             }
             case ADVANCE -> {
                 if (members.stream().filter(member -> campaign.contains(member.chunkPosition())).count() * 2 >= members.size()) {
-                    campaign.setPhase(SporeCampaignSavedData.Phase.OCCUPY, now);
+                    transition(level, campaign, SporeCampaignSavedData.Phase.OCCUPY, now, "至少半数护卫进入目标战区");
                 }
             }
             case OCCUPY -> {
                 List<Objective> hostile = hostileObjectives(level, campaign);
-                if (hostile.isEmpty()) campaign.setPhase(SporeCampaignSavedData.Phase.STABILIZE, now);
-                else if (needsObjectives(level, campaign, members, hostile)) {
-                    List<BlockPos> objectives = reachableObjectives(level, campaign, members, hostile);
-                    if (objectives.isEmpty()) campaign.setPhase(SporeCampaignSavedData.Phase.STABILIZE, now);
-                    else campaign.assignObjectives(objectives);
+                if (hostile.isEmpty() && targetState(level, campaign) != CampaignTerritoryConditions.TargetState.ACTIVE) {
+                    transition(level, campaign, SporeCampaignSavedData.Phase.STABILIZE, now,
+                            "目标已清空或剩余区块不可达");
+                }
+                else if (!hostile.isEmpty()) {
+                    List<BlockPos> objectives = hostile.stream().map(Objective::anchor).distinct()
+                            .limit(campaign.members().size()).toList();
+                    Set<ChunkPos> hostileChunks = hostile.stream().map(Objective::chunk).collect(java.util.stream.Collectors.toSet());
+                    long currentDistinct = campaign.members().stream().map(SporeCampaignSavedData.InfectedMember::objective)
+                            .distinct().count();
+                    boolean invalidObjective = campaign.members().stream()
+                            .anyMatch(member -> !hostileChunks.contains(new ChunkPos(member.objective())));
+                    if (!objectives.isEmpty() && (invalidObjective
+                            || currentDistinct < Math.min(campaign.members().size(), objectives.size()))) {
+                        campaign.assignObjectives(objectives);
+                    }
                 }
             }
             case STABILIZE -> {
-                if (!hostileObjectives(level, campaign).isEmpty()) campaign.setPhase(SporeCampaignSavedData.Phase.OCCUPY, now);
+                if (targetState(level, campaign) == CampaignTerritoryConditions.TargetState.ACTIVE) {
+                    transition(level, campaign, SporeCampaignSavedData.Phase.OCCUPY, now, "出现新的可达目标");
+                }
                 else if (now - campaign.phaseSince() >= STABILIZE_TICKS) {
                     if (campaign.type() == SporeCampaignSavedData.Type.GRAND && config.sporeCampaignMoundEstablishment()
                             && !calamities.isEmpty()) {
                         BlockPos mound = conqueredMoundAnchor(level, campaign);
-                        if (mound != null) { campaign.setMoundAnchor(mound); campaign.setPhase(SporeCampaignSavedData.Phase.ESTABLISH_MOUND, now); }
+                        if (mound != null) {
+                            campaign.setMoundAnchor(mound);
+                            transition(level, campaign, SporeCampaignSavedData.Phase.ESTABLISH_MOUND, now,
+                                    "战区稳定，菌丘候选=" + mound);
+                        }
                         else { finish(level, data, campaign, members, calamities, now, true, "战区已稳固"); return; }
                     } else { finish(level, data, campaign, members, calamities, now, true, "战区已稳固"); return; }
                 }
@@ -138,91 +190,317 @@ public final class SporeCampaignDirector {
                 }
             }
             case RETREAT -> {
-                boolean home = members.stream().allMatch(member -> member.distanceToSqr(campaign.fallback().getX() + 0.5D,
-                        campaign.fallback().getY(), campaign.fallback().getZ() + 0.5D) <= 256.0D);
-                if (home || now - campaign.phaseSince() >= RETREAT_TIMEOUT_TICKS) {
-                    finish(level, data, campaign, members, calamities, now, false, "小队撤退");
-                    return;
-                }
+                // Legacy saves are migrated above before entering the phase switch.
             }
         }
         applyDirectives(campaign, members, calamities);
         data.markChanged();
     }
 
-    private static void prepare(ServerLevel level, Map<ChunkPos, TerritoryControlApi.TerritoryView> visible,
-                                SporeCampaignSavedData data, SporeCampaignSavedData.Type type, long now,
-                                CompatSavedData.Config config) {
-        if (data.campaign(level, type) != null || now < data.cooldownUntil(level, type)) return;
+    private static void prepareAsync(ServerLevel level, SporeCampaignSavedData data, SporeCampaignSavedData.Type type,
+                                     long now, CampaignWorldSnapshotCache.PlanningSnapshot snapshot) {
+        if (data.campaign(level, type) != null || CampaignDeploymentSavedData.get(level).hasScope("SPORE_" + type, type.name())) return;
         SporeCampaignSavedData.Key key = SporeCampaignSavedData.Key.of(level, type);
-        if (now < NEXT_PLAN_ATTEMPT.getOrDefault(key, 0L)) return;
-        NEXT_PLAN_ATTEMPT.put(key, now + PLAN_RETRY_TICKS);
-        planningAttempts++;
+        CampaignPlanningService.JobKey jobKey = new CampaignPlanningService.JobKey(
+                level.dimension().location().toString(), "spore", type.name());
+        if (PROBE_SEQUENCES.containsKey(jobKey)) return;
+        CampaignPlanningService.Completion completion = CampaignPlanningService.poll(jobKey, snapshot.generation());
+        if (completion != null) {
+            completeBackgroundPlan(level, data, type, key, jobKey, completion);
+            return;
+        }
+        if (now < data.cooldownUntil(level, type) || now < NEXT_PLAN_ATTEMPT.getOrDefault(key, 0L)) return;
+        CampaignStrategicPlanner.Request request = planningRequest(level, data, type, snapshot);
+        if (request == null) {
+            NEXT_PLAN_ATTEMPT.put(key, now + PLAN_RETRY_TICKS);
+            return;
+        }
+        if (CampaignPlanningService.submit(jobKey, snapshot.generation(), request)) {
+            planningAttempts++;
+            NEXT_PLAN_ATTEMPT.put(key, now + PLAN_RETRY_TICKS);
+        }
+    }
+
+    private static CampaignStrategicPlanner.Request planningRequest(ServerLevel level, SporeCampaignSavedData data,
+                                                                     SporeCampaignSavedData.Type type,
+                                                                     CampaignWorldSnapshotCache.PlanningSnapshot snapshot) {
         String controller = TerritoryControlApi.factionIdForMod(level, MOD_ID).orElse("");
-        if (controller.isBlank()) return;
-        List<ZoneCandidate> zones = frontierZones(level, visible, controller).stream()
-                .filter(candidate -> data.campaigns(level).stream().noneMatch(active -> sharesBounds(active, candidate.bounds()))).toList();
-        candidateWarzones += zones.size();
-        if (zones.isEmpty()) return;
-        List<Infected> available = availableInfected(level, visible, controller, data);
+        if (controller.isBlank()) {
+            CampaignFailureLog.record("SporeCampaign", "selection result=FAILURE type=" + type + " dimension="
+                    + level.dimension().location() + " rejectedCandidates=0 reason=NO_FACTION_BINDING");
+            return null;
+        }
+        Map<String, Boolean> relations = new HashMap<>();
+        java.util.function.Predicate<String> friendly = faction -> faction != null && !faction.isBlank()
+                && relations.computeIfAbsent(faction, value -> controller.equals(value)
+                || TerritoryControlApi.areFactionsSameOrAllied(level, controller, value));
+        List<CampaignStrategicPlanner.TerritoryCell> cells = new ArrayList<>();
+        Set<Long> friendlyChunks = new HashSet<>();
+        for (Map.Entry<Long, TerritoryControlApi.TerritoryView> entry : snapshot.territories().entrySet()) {
+            TerritoryControlApi.TerritoryView view = entry.getValue();
+            boolean neutral = view.ownerFaction().isBlank() && view.progressFaction().isBlank() && view.contestFaction().isBlank();
+            boolean stableFriendly = friendly.test(view.ownerFaction());
+            boolean hostile = (!view.ownerFaction().isBlank() && !friendly.test(view.ownerFaction()))
+                    || (!view.progressFaction().isBlank() && !friendly.test(view.progressFaction()))
+                    || (!view.contestFaction().isBlank() && !friendly.test(view.contestFaction()));
+            int chunkX = ChunkPos.getX(entry.getKey()), chunkZ = ChunkPos.getZ(entry.getKey());
+            cells.add(new CampaignStrategicPlanner.TerritoryCell(chunkX, chunkZ, stableFriendly, hostile, neutral));
+            if (stableFriendly) friendlyChunks.add(entry.getKey());
+        }
+        Set<CampaignStrategicPlanner.ZoneKey> unsafeZones = new HashSet<>();
+        for (TerritoryControlApi.WarzonePresenceView presence : TerritoryControlApi.warzonePresenceSnapshot(level)) {
+            if (presence.factionCounts().keySet().stream().anyMatch(faction -> !friendly.test(faction))) {
+                unsafeZones.add(new CampaignStrategicPlanner.ZoneKey(presence.zoneX(), presence.zoneZ()));
+            }
+        }
+        Set<UUID> assigned = assignedIds(level, data);
+        SporeCampaignUnitIndex.Snapshot infectedSnapshot = SporeCampaignUnitIndex.infectedSnapshotWithStats(level, friendlyChunks, assigned);
+        SporeCampaignUnitIndex.Snapshot calamitySnapshot = type == SporeCampaignSavedData.Type.GRAND
+                ? SporeCampaignUnitIndex.calamitySnapshotWithStats(level, friendlyChunks, assigned)
+                : new SporeCampaignUnitIndex.Snapshot(List.of(), CampaignStrategicPlanner.SourceStats.empty());
+        List<CampaignStrategicPlanner.Unit> units = infectedSnapshot.units();
+        List<CampaignStrategicPlanner.Unit> calamities = calamitySnapshot.units();
         int minimum = type == SporeCampaignSavedData.Type.REGULAR ? REGULAR_MIN : GRAND_MIN;
-        if (available.size() < minimum) return;
-        ZoneCandidate selected = zones.stream().min(Comparator.comparingDouble(zone -> nearestDistanceSqr(available, zone.rally()))).orElse(null);
-        if (selected == null) return;
-        available.sort(Comparator.comparingDouble(member -> member.distanceToSqr(selected.rally().getX() + 0.5D, selected.rally().getY(), selected.rally().getZ() + 0.5D)));
         int maximum = type == SporeCampaignSavedData.Type.REGULAR ? REGULAR_MAX : GRAND_MAX;
-        List<Infected> members = selectReachable(available, selected, maximum);
-        if (members.size() < minimum) return;
+        int requiredCalamities = type == SporeCampaignSavedData.Type.GRAND ? (calamities.size() >= 4 ? 2 : 1) : 0;
+        int size = com.arxyt.territorycontrol.core.data.TerritorySavedData.get(level).warzoneConfig().normalized().sizeChunks();
+        CampaignWorldSnapshotCache.markFrontierHot(level, CampaignStrategicPlanner.frontierTerrainChunks(cells, size));
+        Set<Long> unsafeRallyChunks = CampaignRallySafety.unsafeRallyChunks(level,
+                CampaignStrategicPlanner.potentialRallyChunks(cells, size), friendly);
+        List<UUID> cooldownAuditIds = new ArrayList<>(units.stream().map(CampaignStrategicPlanner.Unit::id).toList());
+        cooldownAuditIds.addAll(calamities.stream().map(CampaignStrategicPlanner.Unit::id).toList());
+        String cooldownAudit = CampaignCombatTracker.cooldownAudit(level, cooldownAuditIds);
+        candidateWarzones += cells.size();
+        return new CampaignStrategicPlanner.Request(type == SporeCampaignSavedData.Type.REGULAR
+                ? CampaignStrategicPlanner.Kind.SPORE_REGULAR : CampaignStrategicPlanner.Kind.SPORE_GRAND,
+                size, minimum, maximum, requiredCalamities, cells, unsafeZones, units, calamities, snapshot.terrain(),
+                unsafeRallyChunks, cooldownAudit, infectedSnapshot.stats(), calamitySnapshot.stats());
+    }
 
-        List<Calamity> calamities = List.of();
-        if (type == SporeCampaignSavedData.Type.GRAND) {
-            List<Calamity> availableCalamities = availableCalamities(level, visible, controller, data);
-            int required = availableCalamities.size() >= 4 ? 2 : 1;
-            calamities = selectReachableCalamities(availableCalamities, selected, required);
-            if (calamities.size() != required) return;
+    private static void completeBackgroundPlan(ServerLevel level, SporeCampaignSavedData data,
+                                               SporeCampaignSavedData.Type type, SporeCampaignSavedData.Key key,
+                                               CampaignPlanningService.JobKey jobKey,
+                                               CampaignPlanningService.Completion completion) {
+        if (completion.expired()) return;
+        if (completion.failure() != null || completion.result() == null || !completion.result().success()) {
+            String reason = completion.failure() != null ? completion.failure().toString()
+                    : completion.result() == null ? "NO_RESULT" : completion.result().reason();
+            int rejected = completion.result() == null ? 0 : completion.result().rejectedCandidates();
+            String diagnostics = completion.result() == null ? "" : " diagnostics=" + completion.result().diagnostics().compact();
+            CampaignFailureLog.record("SporeCampaign", "selection result=FAILURE type=" + type + " dimension="
+                    + level.dimension().location() + " rejectedCandidates=" + rejected + " reason=" + reason + diagnostics);
+            return;
         }
-        List<SporeCampaignSavedData.InfectedMember> snapshots = new ArrayList<>();
-        for (int index = 0; index < members.size(); index++) {
-            Infected member = members.get(index);
-            snapshots.add(new SporeCampaignSavedData.InfectedMember(member.getUUID(), member.getLinked(), member.getSearchPos(),
-                    selected.objectives().get(index % selected.objectives().size()).anchor()));
+        ProbeSequence sequence = new ProbeSequence(new java.util.ArrayDeque<>(completion.result().options()),
+                completion.result().rejectedCandidates(), completion.result().diagnostics().cooldownAudit());
+        PROBE_SEQUENCES.put(jobKey, sequence);
+        startNextProbe(level, type, key, jobKey, sequence);
+    }
+
+    private static void startNextProbe(ServerLevel level, SporeCampaignSavedData.Type type,
+                                       SporeCampaignSavedData.Key key, CampaignPlanningService.JobKey jobKey,
+                                       ProbeSequence sequence) {
+        CampaignStrategicPlanner.Option option = sequence.options.poll();
+        if (option == null) {
+            CampaignUnitReservations.release(jobKey);
+            PROBE_SEQUENCES.remove(jobKey);
+            CampaignFailureLog.record("SporeCampaign", "selection result=FAILURE type=" + type + " dimension="
+                    + level.dimension().location() + " rejectedCandidates=" + sequence.rejected
+                    + " reason=ALL_ROUTE_PROBES_FAILED probeFailures=" + sequence.failureSummary());
+            return;
         }
-        List<SporeCampaignSavedData.CalamityMember> calamitySnapshots = new ArrayList<>();
-        for (int index = 0; index < calamities.size(); index++) {
-            Calamity calamity = calamities.get(index);
-            calamitySnapshots.add(new SporeCampaignSavedData.CalamityMember(calamity.getUUID(), calamity.getSearchArea(),
-                    selected.objectives().get(index % selected.objectives().size()).anchor(), false, false));
+        List<UUID> reservationIds = new ArrayList<>(option.memberIds());
+        reservationIds.addAll(option.calamityIds());
+        if (!CampaignUnitReservations.tryReserve(jobKey, reservationIds)) {
+            sequence.reject("RESERVATION_FAILED");
+            startNextProbe(level, type, key, jobKey, sequence);
+            return;
         }
-        SporeCampaignSavedData.Campaign campaign = new SporeCampaignSavedData.Campaign(UUID.randomUUID(), key,
-                selected.bounds().minChunkX(), selected.bounds().minChunkZ(), selected.bounds().maxChunkX(), selected.bounds().maxChunkZ(),
-                selected.rally(), selected.rally(), snapshots, calamitySnapshots, SporeCampaignSavedData.Phase.MUSTER, now, now);
+        SporeCampaignSavedData currentData = SporeCampaignSavedData.get(level);
+        Set<UUID> initialAssigned = assignedIds(level, currentData);
+        List<Infected> initialUnits = SporeCampaignUnitIndex.resolveInfected(level, option.memberIds(), initialAssigned);
+        List<Calamity> initialCalamities = SporeCampaignUnitIndex.resolveCalamities(level, option.calamityIds(), initialAssigned);
+        String controller = TerritoryControlApi.factionIdForMod(level, MOD_ID).orElse("");
+        List<Entity> validationUnits = new ArrayList<>(initialUnits);
+        validationUnits.addAll(initialCalamities);
+        int minimum = type == SporeCampaignSavedData.Type.REGULAR ? REGULAR_MIN : GRAND_MIN;
+        if (initialUnits.size() < minimum) {
+            CampaignUnitReservations.release(jobKey);
+            sequence.reject("PRE_PROBE_MIN_UNITS");
+            startNextProbe(level, type, key, jobKey, sequence);
+            return;
+        }
+        if (initialCalamities.size() < option.calamityIds().size()) {
+            CampaignUnitReservations.release(jobKey);
+            sequence.reject("PRE_PROBE_CALAMITIES_UNAVAILABLE");
+            startNextProbe(level, type, key, jobKey, sequence);
+            return;
+        }
+        CampaignPlanValidation.Result preProbeValidation = CampaignPlanValidation.validate(level, controller, option, validationUnits);
+        if (preProbeValidation != CampaignPlanValidation.Result.VALID) {
+            CampaignUnitReservations.release(jobKey);
+            sequence.reject("PRE_PROBE_" + preProbeValidation);
+            startNextProbe(level, type, key, jobKey, sequence);
+            return;
+        }
+        CampaignWorldSnapshotCache.markHot(level, option);
+        int size = com.arxyt.territorycontrol.core.data.TerritorySavedData.get(level)
+                .warzoneConfig().normalized().sizeChunks();
+        int movers = (int) validationUnits.stream().filter(unit -> !CampaignStrategicPlanner.inPlace(
+                option.candidate(), size, unit.getBlockX() >> 4, unit.getBlockZ() >> 4)).count();
+        if (!CampaignRallyPlacementService.submit(level, jobKey, controller, option, movers, placement -> {
+            if (!placement.success()) {
+                CampaignUnitReservations.release(jobKey);
+                if (targetResolvedReason(placement.reason())) {
+                    sequence.rejectTarget(option.candidate().target(), placement.reason());
+                } else {
+                    sequence.reject(placement.reason());
+                }
+                startNextProbe(level, type, key, jobKey, sequence);
+                return;
+            }
+            CampaignPlanValidation.Result placementValidation = CampaignPlanValidation.validate(
+                    level, controller, option, validationUnits);
+            if (placementValidation != CampaignPlanValidation.Result.VALID) {
+                CampaignUnitReservations.release(jobKey);
+                if (placementValidation == CampaignPlanValidation.Result.TARGET_WARZONE_FULLY_FRIENDLY
+                        || placementValidation == CampaignPlanValidation.Result.TARGET_NO_REACHABLE_OBJECTIVES) {
+                    sequence.rejectTarget(option.candidate().target(), "PLACEMENT_" + placementValidation);
+                } else {
+                    sequence.reject("PLACEMENT_" + placementValidation);
+                }
+                startNextProbe(level, type, key, jobKey, sequence);
+                return;
+            }
+            if (!CampaignRouteProbeService.submit(level, jobKey, controller, option, placement.positions().get(0), outcome -> {
+            if (!outcome.success()) {
+                CampaignUnitReservations.release(jobKey);
+                if (targetResolvedReason(outcome.reason())) {
+                    sequence.rejectTarget(option.candidate().target(), outcome.reason());
+                } else {
+                    sequence.reject("PROBE_" + outcome.reason());
+                }
+                startNextProbe(level, type, key, jobKey, sequence);
+                return;
+            }
+            SporeCampaignSavedData campaignData = SporeCampaignSavedData.get(level);
+            Set<UUID> assigned = assignedIds(level, campaignData);
+            List<Infected> units = SporeCampaignUnitIndex.resolveInfected(level, option.memberIds(), assigned);
+            List<Calamity> calamities = SporeCampaignUnitIndex.resolveCalamities(level, option.calamityIds(), assigned);
+            List<Entity> currentUnits = new ArrayList<>(units);
+            currentUnits.addAll(calamities);
+            String currentController = TerritoryControlApi.factionIdForMod(level, MOD_ID).orElse("");
+            if (units.size() < minimum) {
+                CampaignUnitReservations.release(jobKey);
+                sequence.reject("POST_PROBE_MIN_UNITS");
+                startNextProbe(level, type, key, jobKey, sequence);
+                return;
+            }
+            if (calamities.size() < option.calamityIds().size()) {
+                CampaignUnitReservations.release(jobKey);
+                sequence.reject("POST_PROBE_CALAMITIES_UNAVAILABLE");
+                startNextProbe(level, type, key, jobKey, sequence);
+                return;
+            }
+            CampaignPlanValidation.Result postProbeValidation = CampaignPlanValidation.validate(
+                    level, currentController, option, currentUnits);
+            if (postProbeValidation != CampaignPlanValidation.Result.VALID) {
+                CampaignUnitReservations.release(jobKey);
+                sequence.reject("POST_PROBE_" + postProbeValidation);
+                startNextProbe(level, type, key, jobKey, sequence);
+                return;
+            }
+            CampaignDeploymentService.BeginResult deployment = CampaignDeploymentService.begin(
+                    level, "SPORE_" + type, type.name(), sequence.rejected, option, units, calamities,
+                    placement.positions().get(0),
+                    movers == 0 ? List.of() : placement.positions());
+            if (deployment != CampaignDeploymentService.BeginResult.STARTED) {
+                CampaignUnitReservations.release(jobKey);
+                sequence.reject("DEPLOYMENT_" + deployment);
+                startNextProbe(level, type, key, jobKey, sequence);
+                return;
+            }
+            PROBE_SEQUENCES.remove(jobKey);
+            })) {
+                CampaignUnitReservations.release(jobKey);
+                sequence.reject("PROBE_QUEUE_REJECTED");
+                startNextProbe(level, type, key, jobKey, sequence);
+            } else {
+                sequence.probesSubmitted++;
+            }
+        })) {
+            CampaignUnitReservations.release(jobKey);
+            sequence.reject("RALLY_PLACEMENT_QUEUE_REJECTED");
+            startNextProbe(level, type, key, jobKey, sequence);
+        }
+    }
+
+    static CampaignDeploymentService.FinalizationResult completeDeployment(ServerLevel level, CampaignDeploymentSavedData.Deployment deployment) {
+        SporeCampaignSavedData.Type type;
+        try { type = SporeCampaignSavedData.Type.valueOf(deployment.scope); } catch (RuntimeException invalid) {
+            return CampaignDeploymentService.FinalizationResult.INVALID_SCOPE;
+        }
+        SporeCampaignSavedData data = SporeCampaignSavedData.get(level);
+        if (data.campaign(level, type) != null) return CampaignDeploymentService.FinalizationResult.CAMPAIGN_ALREADY_ACTIVE;
+        String controller = TerritoryControlApi.factionIdForMod(level, MOD_ID).orElse("");
+        if (controller.isBlank()) return CampaignDeploymentService.FinalizationResult.CONTROLLER_MISSING;
+        int size = com.arxyt.territorycontrol.core.data.TerritorySavedData.get(level)
+                .warzoneConfig().normalized().sizeChunks();
+        CampaignStrategicPlanner.ZoneKey target = CampaignStrategicPlanner.zone(
+                deployment.minChunkX, deployment.minChunkZ, size);
+        CampaignStrategicPlanner.ChunkKey rally = new CampaignStrategicPlanner.ChunkKey(
+                deployment.rally.getX() >> 4, deployment.rally.getZ() >> 4);
+        CampaignTerritoryConditions.TargetState targetState = CampaignTerritoryConditions.targetState(level, controller, target);
+        if (targetState == CampaignTerritoryConditions.TargetState.FULLY_FRIENDLY) {
+            return CampaignDeploymentService.FinalizationResult.TARGET_WARZONE_FULLY_FRIENDLY;
+        }
+        if (targetState == CampaignTerritoryConditions.TargetState.NO_REACHABLE_OBJECTIVES) {
+            return CampaignDeploymentService.FinalizationResult.TARGET_NO_REACHABLE_OBJECTIVES;
+        }
+        if (!CampaignTerritoryConditions.rallyChunkOwnedByFriendlyBloc(level, controller, rally)) {
+            return CampaignDeploymentService.FinalizationResult.RALLY_OWNER_LOST;
+        }
+        if (!CampaignRallySafety.isSafeNow(level, deployment.rally,
+                faction -> isFriendlyBloc(level, controller, faction))) {
+            return CampaignDeploymentService.FinalizationResult.RALLY_SAFETY_BLOCKED;
+        }
+        if (deployment.members.stream().anyMatch(member -> {
+            Entity entity = level.getEntity(member.id);
+            return entity != null && !CampaignDeploymentService.isInPlace(level, deployment, entity)
+                    && (entity instanceof Mob mob
+                    ? CampaignCombatTracker.blocksMobilization(level, mob)
+                    : CampaignCombatTracker.recentlyInCombat(level, member.id));
+        })) return CampaignDeploymentService.FinalizationResult.MEMBER_BUSY;
+        List<Infected> units = new ArrayList<>();
+        List<Calamity> calamities = new ArrayList<>();
+        for (CampaignDeploymentSavedData.Member member : deployment.members) {
+            Entity entity = level.getEntity(member.id);
+            if (!member.calamity && entity instanceof Infected infected && infected.isAlive()) units.add(infected);
+            if (member.calamity && entity instanceof Calamity calamity && calamity.isAlive()) calamities.add(calamity);
+        }
+        int minimum = type == SporeCampaignSavedData.Type.REGULAR ? REGULAR_MIN : GRAND_MIN;
+        if (units.size() < minimum || (type == SporeCampaignSavedData.Type.GRAND && calamities.isEmpty())) {
+            return CampaignDeploymentService.FinalizationResult.MINIMUM_UNITS;
+        }
+        List<SporeCampaignSavedData.InfectedMember> memberStates = units.stream()
+                .map(unit -> new SporeCampaignSavedData.InfectedMember(unit.getUUID(), unit.getLinked(), unit.getSearchPos(), deployment.target)).toList();
+        List<SporeCampaignSavedData.CalamityMember> calamityStates = calamities.stream()
+                .map(unit -> new SporeCampaignSavedData.CalamityMember(unit.getUUID(), unit.getSearchArea(), deployment.target, false, false)).toList();
+        UUID campaignId = UUID.randomUUID();
+        SporeCampaignSavedData.Campaign campaign = new SporeCampaignSavedData.Campaign(campaignId,
+                SporeCampaignSavedData.Key.of(level, type), deployment.minChunkX, deployment.minChunkZ,
+                deployment.maxChunkX, deployment.maxChunkZ, deployment.rally, deployment.rally,
+                memberStates, calamityStates, SporeCampaignSavedData.Phase.MUSTER,
+                level.getGameTime(), level.getGameTime());
         data.put(campaign);
-        deployScent(level, campaign, config);
+        deployScent(level, campaign, CompatSavedData.get(level).config());
         campaignsStarted++;
-        applyDirectives(campaign, members, calamities);
-        notifyNearby(level, selected.rally(), (type == SporeCampaignSavedData.Type.GRAND ? "真菌大型远征" : "真菌蜂群") + "正在集结，准备进攻战区。");
-    }
-
-    private static List<Infected> selectReachable(List<Infected> available, ZoneCandidate selected, int maximum) {
-        List<Infected> result = new ArrayList<>();
-        for (Infected candidate : available) {
-            if (result.size() == maximum) break;
-            Objective objective = selected.objectives().get(result.size() % selected.objectives().size());
-            pathProbes += 2;
-            if (CampaignTerrainResolver.canReach(candidate, selected.rally()) && CampaignTerrainResolver.canReach(candidate, objective.anchor())) result.add(candidate);
-        }
-        return result;
-    }
-
-    private static List<Calamity> selectReachableCalamities(List<Calamity> available, ZoneCandidate selected, int required) {
-        List<Calamity> result = new ArrayList<>();
-        for (Calamity candidate : available) {
-            if (result.size() == required) break;
-            Objective objective = selected.objectives().get(result.size() % selected.objectives().size());
-            pathProbes++;
-            if (CampaignTerrainResolver.canReach(candidate, objective.anchor())) result.add(candidate);
-        }
-        return result;
+        applyDirectives(campaign, units, calamities);
+        LOGGER.info("[SporeCampaign] selection result=SUCCESS type={} dimension={} rejectedCandidates={} campaign={}",
+                type, level.dimension().location(), deployment.rejectedCandidates, campaignId);
+        notifyNearby(level, deployment.rally, (type == SporeCampaignSavedData.Type.GRAND ? "真菌大型远征" : "真菌蜂群")
+                + "已完成战略部署，准备进攻战区。");
+        return CampaignDeploymentService.FinalizationResult.STARTED;
     }
 
     private static void deployScent(ServerLevel level, SporeCampaignSavedData.Campaign campaign, CompatSavedData.Config config) {
@@ -240,7 +518,8 @@ public final class SporeCampaignDirector {
         for (SporeCampaignSavedData.InfectedMember member : campaign.members()) objectives.put(member.id(), member.objective());
         for (Infected member : members) {
             BlockPos target = switch (campaign.phase()) {
-                case MUSTER -> campaign.rally();
+                case MUSTER -> campaign.contains(member.chunkPosition())
+                        ? objectives.getOrDefault(member.getUUID(), campaign.rally()) : campaign.rally();
                 case RETREAT -> campaign.fallback();
                 default -> objectives.getOrDefault(member.getUUID(), campaign.rally());
             };
@@ -269,7 +548,7 @@ public final class SporeCampaignDirector {
         for (Calamity calamity : calamities) {
             SporeCampaignSavedData.CalamityMember state = campaign.calamities().stream()
                     .filter(value -> value.id().equals(calamity.getUUID())).findFirst().orElse(null);
-            if (state != null && !state.moundRequested() && CampaignTerrainResolver.canReach(calamity, anchor)) {
+            if (state != null && !state.moundRequested()) {
                 calamity.setSearchArea(anchor);
                 campaign.markMoundRequested(calamity.getUUID());
             }
@@ -292,60 +571,40 @@ public final class SporeCampaignDirector {
         String controller = TerritoryControlApi.factionIdForMod(level, MOD_ID).orElse("");
         if (controller.isBlank()) return List.of();
         List<Objective> result = new ArrayList<>();
-        for (var entry : TerritoryControlApi.territoriesInRange(level, campaign.minChunkX(), campaign.minChunkZ(), campaign.maxChunkX(), campaign.maxChunkZ())) {
-            if (campaign.isIgnored(entry.getKey()) || !hostile(level, controller, entry.getValue())) continue;
-            BlockPos anchor = CampaignTerrainResolver.findLandAnchor(level, entry.getKey(), campaign.rally()).orElse(null);
-            if (anchor == null) { campaign.ignore(entry.getKey()); continue; }
-            result.add(new Objective(entry.getKey(), anchor));
-        }
-        result.sort(Comparator.comparingDouble(value -> chunkDistanceSqr(value.chunk(), campaign.rally())));
-        return result;
-    }
-
-    private static boolean needsObjectives(ServerLevel level, SporeCampaignSavedData.Campaign campaign,
-                                           List<Infected> members, List<Objective> hostile) {
-        Set<ChunkPos> chunks = hostile.stream().map(Objective::chunk).collect(java.util.stream.Collectors.toSet());
-        if (campaign.members().stream().noneMatch(member -> chunks.contains(new ChunkPos(member.objective())))) return true;
-        int reachable = 0;
-        for (Infected member : members) {
-            SporeCampaignSavedData.InfectedMember state = campaign.members().stream()
-                    .filter(value -> value.id().equals(member.getUUID())).findFirst().orElse(null);
-            if (state != null && CampaignTerrainResolver.canReach(member, state.objective())) reachable++;
-        }
-        return reachable < CampaignTerrainResolver.twoThirds(members.size());
-    }
-
-    private static List<BlockPos> reachableObjectives(ServerLevel level, SporeCampaignSavedData.Campaign campaign,
-                                                       List<Infected> members, List<Objective> candidates) {
-        List<BlockPos> result = new ArrayList<>();
-        for (Objective candidate : candidates) {
-            if (campaign.isIgnored(candidate.chunk())) continue;
-            pathProbes += members.size();
-            if (CampaignTerrainResolver.reachable(members, candidate.anchor()).size() < CampaignTerrainResolver.twoThirds(members.size())) {
-                campaign.ignore(candidate.chunk());
-                continue;
+        for (int x = campaign.minChunkX(); x <= campaign.maxChunkX(); x++) {
+            for (int z = campaign.minChunkZ(); z <= campaign.maxChunkZ(); z++) {
+                ChunkPos chunk = new ChunkPos(x, z);
+                if (campaign.isIgnored(chunk)
+                        || CampaignTerritoryConditions.chunkOwnedByFriendlyBloc(level, controller, x, z)) continue;
+                List<BlockPos> anchors = CampaignWorldSnapshotCache.safeAnchors(level, x, z, campaign.members().size());
+                if (anchors.isEmpty()) {
+                    if (CampaignWorldSnapshotCache.hasTerrainSnapshot(level, x, z)) campaign.ignore(chunk);
+                    continue;
+                }
+                for (BlockPos anchor : anchors) result.add(new Objective(chunk, anchor, false));
             }
-            result.add(candidate.anchor());
-            if (result.size() == 3) break;
         }
+        result.sort(Comparator.comparing(Objective::elevated)
+                .thenComparingDouble(value -> chunkDistanceSqr(value.chunk(), campaign.rally())));
         return result;
+    }
+
+    private static CampaignTerritoryConditions.TargetState targetState(
+            ServerLevel level, SporeCampaignSavedData.Campaign campaign) {
+        String controller = TerritoryControlApi.factionIdForMod(level, MOD_ID).orElse("");
+        int size = com.arxyt.territorycontrol.core.data.TerritorySavedData.get(level)
+                .warzoneConfig().normalized().sizeChunks();
+        return CampaignTerritoryConditions.targetState(level, controller,
+                CampaignStrategicPlanner.zone(campaign.minChunkX(), campaign.minChunkZ(), size));
     }
 
     private static BlockPos conqueredMoundAnchor(ServerLevel level, SporeCampaignSavedData.Campaign campaign) {
         for (SporeCampaignSavedData.InfectedMember member : campaign.members()) {
-            BlockPos anchor = CampaignTerrainResolver.findLandAnchor(level, new ChunkPos(member.objective()), member.objective()).orElse(null);
+            ChunkPos chunk = new ChunkPos(member.objective());
+            BlockPos anchor = CampaignWorldSnapshotCache.safeAnchor(level, chunk.x, chunk.z);
             if (anchor != null && TerritoryControlApi.isOwnedByModFaction(level, anchor, MOD_ID)) return anchor;
         }
         return null;
-    }
-
-    private static void beginRetreat(ServerLevel level, SporeCampaignSavedData data, SporeCampaignSavedData.Campaign campaign,
-                                     List<Infected> members, List<Calamity> calamities, long now, String reason) {
-        if (campaign.phase() == SporeCampaignSavedData.Phase.RETREAT) return;
-        campaign.setPhase(SporeCampaignSavedData.Phase.RETREAT, now);
-        applyDirectives(campaign, members, calamities);
-        data.markChanged();
-        notifyNearby(level, campaign.rally(), "真菌战役撤退：" + reason);
     }
 
     private static void finish(ServerLevel level, SporeCampaignSavedData data, SporeCampaignSavedData.Campaign campaign,
@@ -359,6 +618,13 @@ public final class SporeCampaignDirector {
         data.setCooldownUntil(level, campaign.type(), now + minutesToTicks(minutes));
         NEXT_PLAN_ATTEMPT.remove(campaign.key());
         if (victory) campaignsCompleted++; else campaignsFailed++;
+        if (victory) {
+            LOGGER.info("[SporeCampaign] result=SUCCESS type={} id={} dimension={} tick={} reason={} members={} calamities={}",
+                    campaign.type(), campaign.id(), level.dimension().location(), now, reason, members.size(), calamities.size());
+        } else {
+            CampaignFailureLog.record("SporeCampaign", "campaign result=FAILURE type=" + campaign.type() + " id="
+                    + campaign.id() + " dimension=" + level.dimension().location() + " reason=" + reason);
+        }
         notifyNearby(level, campaign.rally(), "真菌" + (campaign.type() == SporeCampaignSavedData.Type.GRAND ? "大型远征" : "蜂群战役")
                 + (victory ? "胜利：" : "失败：") + reason);
     }
@@ -418,42 +684,9 @@ public final class SporeCampaignDirector {
     }
 
     private static boolean mustered(SporeCampaignSavedData.Campaign campaign, List<Infected> members) {
-        return members.stream().filter(member -> member.distanceToSqr(campaign.rally().getX() + 0.5D, campaign.rally().getY(), campaign.rally().getZ() + 0.5D) <= 256.0D).count() * 4 >= members.size() * 3;
-    }
-
-    private static Map<ChunkPos, TerritoryControlApi.TerritoryView> visibleTerritories(ServerLevel level, List<ServerPlayer> players) {
-        Map<ChunkPos, TerritoryControlApi.TerritoryView> result = new LinkedHashMap<>();
-        int radius = Math.max(0, level.getServer().getPlayerList().getViewDistance());
-        for (ServerPlayer player : players) {
-            ChunkPos center = player.chunkPosition();
-            for (var entry : TerritoryControlApi.territoriesInRange(level, center.x - radius, center.z - radius, center.x + radius, center.z + radius)) {
-                if (level.hasChunk(entry.getKey().x, entry.getKey().z)) result.put(entry.getKey(), entry.getValue());
-            }
-        }
-        return result;
-    }
-
-    private static List<ZoneCandidate> frontierZones(ServerLevel level, Map<ChunkPos, TerritoryControlApi.TerritoryView> visible, String controller) {
-        Map<Warzone.Bounds, ZoneBuilder> zones = new LinkedHashMap<>();
-        int size = com.arxyt.territorycontrol.core.data.TerritorySavedData.get(level).warzoneConfig().normalized().sizeChunks();
-        for (var entry : visible.entrySet()) {
-            if (!hostile(level, controller, entry.getValue())) continue;
-            ChunkPos friendly = friendlyNeighbor(visible, entry.getKey(), controller);
-            if (friendly == null) continue;
-            BlockPos rally = CampaignTerrainResolver.findLandAnchor(level, friendly, null).orElse(null);
-            BlockPos objective = CampaignTerrainResolver.findLandAnchor(level, entry.getKey(), rally).orElse(null);
-            if (rally == null || objective == null) continue;
-            Warzone.Bounds bounds = Warzone.boundsFor(entry.getKey(), size);
-            ZoneBuilder builder = zones.computeIfAbsent(bounds, ignored -> new ZoneBuilder(bounds, rally));
-            builder.objectives.add(new Objective(entry.getKey(), objective));
-        }
-        List<ZoneCandidate> result = new ArrayList<>();
-        for (ZoneBuilder builder : zones.values()) {
-            List<Objective> objectives = builder.objectives.stream().distinct()
-                    .sorted(Comparator.comparingDouble(value -> chunkDistanceSqr(value.chunk(), builder.rally))).limit(3).toList();
-            if (!objectives.isEmpty()) result.add(new ZoneCandidate(builder.bounds, builder.rally, objectives));
-        }
-        return result;
+        return members.stream().filter(member -> campaign.contains(member.chunkPosition())
+                || member.distanceToSqr(campaign.rally().getX() + 0.5D,
+                campaign.rally().getY(), campaign.rally().getZ() + 0.5D) <= 256.0D).count() * 4 >= members.size() * 3;
     }
 
     private static boolean hostile(ServerLevel level, String controller, TerritoryControlApi.TerritoryView territory) {
@@ -463,45 +696,9 @@ public final class SporeCampaignDirector {
     private static boolean hostileFaction(ServerLevel level, String controller, String other) {
         return other != null && !other.isBlank() && !other.equals(controller) && !TerritoryControlApi.areFactionsSameOrAllied(level, controller, other);
     }
-    private static ChunkPos friendlyNeighbor(Map<ChunkPos, TerritoryControlApi.TerritoryView> visible, ChunkPos enemy, String controller) {
-        for (int[] offset : new int[][]{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
-            ChunkPos candidate = new ChunkPos(enemy.x + offset[0], enemy.z + offset[1]);
-            TerritoryControlApi.TerritoryView view = visible.get(candidate);
-            if (view != null && controller.equals(view.ownerFaction())) return candidate;
-        }
-        return null;
-    }
-
-    private static List<Infected> availableInfected(ServerLevel level, Map<ChunkPos, TerritoryControlApi.TerritoryView> visible,
-                                                     String controller, SporeCampaignSavedData data) {
-        Set<UUID> assigned = assignedIds(level, data);
-        Set<UUID> seen = new HashSet<>();
-        List<Infected> result = new ArrayList<>();
-        for (var entry : visible.entrySet()) {
-            if (!controller.equals(entry.getValue().ownerFaction())) continue;
-            ChunkPos chunk = entry.getKey();
-            AABB area = new AABB(chunk.getMinBlockX(), level.getMinBuildHeight(), chunk.getMinBlockZ(), chunk.getMaxBlockX() + 1.0D, level.getMaxBuildHeight(), chunk.getMaxBlockZ() + 1.0D);
-            for (Infected infected : level.getEntitiesOfClass(Infected.class, area, entity -> entity.isAlive() && !entity.isRemoved())) {
-                if (seen.add(infected.getUUID()) && !assigned.contains(infected.getUUID()) && infected.getTarget() == null && infected.getSearchPos() == null) result.add(infected);
-            }
-        }
-        return result;
-    }
-
-    private static List<Calamity> availableCalamities(ServerLevel level, Map<ChunkPos, TerritoryControlApi.TerritoryView> visible,
-                                                       String controller, SporeCampaignSavedData data) {
-        Set<UUID> assigned = assignedIds(level, data);
-        Set<UUID> seen = new HashSet<>();
-        List<Calamity> result = new ArrayList<>();
-        for (var entry : visible.entrySet()) {
-            if (!controller.equals(entry.getValue().ownerFaction())) continue;
-            ChunkPos chunk = entry.getKey();
-            AABB area = new AABB(chunk.getMinBlockX(), level.getMinBuildHeight(), chunk.getMinBlockZ(), chunk.getMaxBlockX() + 1.0D, level.getMaxBuildHeight(), chunk.getMaxBlockZ() + 1.0D);
-            for (Calamity calamity : level.getEntitiesOfClass(Calamity.class, area, entity -> entity.isAlive() && !entity.isRemoved())) {
-                if (seen.add(calamity.getUUID()) && !assigned.contains(calamity.getUUID()) && calamity.getTarget() == null && calamity.getSearchArea().equals(BlockPos.ZERO)) result.add(calamity);
-            }
-        }
-        return result;
+    private static boolean isFriendlyBloc(ServerLevel level, String controller, String faction) {
+        return faction != null && !faction.isBlank() && (controller.equals(faction)
+                || TerritoryControlApi.areFactionsSameOrAllied(level, controller, faction));
     }
 
     private static Set<UUID> assignedIds(ServerLevel level, SporeCampaignSavedData data) {
@@ -542,6 +739,34 @@ public final class SporeCampaignDirector {
     }
 
     public static Metrics metrics() { return new Metrics(planningAttempts, candidateWarzones, pathProbes, campaignsStarted, campaignsCompleted, campaignsFailed, pauses); }
+
+    static void retryAfterDeployment(ServerLevel level, String scope) {
+        try {
+            SporeCampaignSavedData.Type type = SporeCampaignSavedData.Type.valueOf(scope);
+            NEXT_PLAN_ATTEMPT.put(new SporeCampaignSavedData.Key(
+                    level.dimension().location().toString(), type), level.getGameTime());
+        } catch (RuntimeException ignored) { }
+    }
+
+    private static boolean targetResolvedReason(String reason) {
+        return "TARGET_WARZONE_FULLY_FRIENDLY".equals(reason)
+                || "TARGET_NO_REACHABLE_OBJECTIVES".equals(reason);
+    }
+    private static void transition(ServerLevel level, SporeCampaignSavedData.Campaign campaign,
+                                   SporeCampaignSavedData.Phase next, long now, String reason) {
+        SporeCampaignSavedData.Phase previous = campaign.phase();
+        campaign.setPhase(next, now);
+        LOGGER.info("[SporeCampaign] phase type={} id={} dimension={} tick={} {}->{} reason={} rally={}",
+                campaign.type(), campaign.id(), level.dimension().location(), now, previous, next, reason, campaign.rally());
+    }
+
+    private static void logCampaign(ServerLevel level, SporeCampaignSavedData.Campaign campaign,
+                                    String event, String detail) {
+        LOGGER.info("[SporeCampaign] event={} type={} id={} dimension={} tick={} phase={} zone={},{},{}:{} {}", event,
+                campaign.type(), campaign.id(), level.dimension().location(), level.getGameTime(), campaign.phase(),
+                campaign.minChunkX(), campaign.minChunkZ(), campaign.maxChunkX(), campaign.maxChunkZ(), detail);
+    }
+
     private static long minutesToTicks(int minutes) { return Math.max(1L, Math.min(1440L, minutes)) * 1_200L; }
     private static boolean sharesBounds(SporeCampaignSavedData.Campaign campaign, Warzone.Bounds bounds) {
         return campaign.minChunkX() <= bounds.maxChunkX() && campaign.maxChunkX() >= bounds.minChunkX()
@@ -554,11 +779,43 @@ public final class SporeCampaignDirector {
             }
         }
     }
-    private static double nearestDistanceSqr(List<Infected> members, BlockPos point) { return members.stream().mapToDouble(member -> member.distanceToSqr(point.getX() + 0.5D, point.getY(), point.getZ() + 0.5D)).min().orElse(Double.MAX_VALUE); }
     private static double chunkDistanceSqr(ChunkPos chunk, BlockPos point) { double x = chunk.getMiddleBlockX() - point.getX(), z = chunk.getMiddleBlockZ() - point.getZ(); return x * x + z * z; }
 
-    private record Objective(ChunkPos chunk, BlockPos anchor) { }
-    private static final class ZoneBuilder { private final Warzone.Bounds bounds; private final BlockPos rally; private final List<Objective> objectives = new ArrayList<>(); private ZoneBuilder(Warzone.Bounds bounds, BlockPos rally) { this.bounds = bounds; this.rally = rally; } }
-    private record ZoneCandidate(Warzone.Bounds bounds, BlockPos rally, List<Objective> objectives) { }
+    private record Objective(ChunkPos chunk, BlockPos anchor, boolean elevated) { }
+    private static final class ProbeSequence {
+        private final java.util.ArrayDeque<CampaignStrategicPlanner.Option> options;
+        private final Map<String, Integer> failures = new java.util.TreeMap<>();
+        private final String cooldownAudit;
+        private int rejected;
+        private int probesSubmitted;
+        private ProbeSequence(java.util.ArrayDeque<CampaignStrategicPlanner.Option> options, int rejected, String cooldownAudit) {
+            this.options = options;
+            this.rejected = rejected;
+            this.cooldownAudit = cooldownAudit == null || cooldownAudit.isBlank() ? "none" : cooldownAudit;
+        }
+        private void reject(String reason) {
+            rejected++;
+            failures.merge(reason == null || reason.isBlank() ? "UNKNOWN" : reason, 1, Integer::sum);
+        }
+        private void rejectTarget(CampaignStrategicPlanner.ZoneKey target, String reason) {
+            reject(reason);
+            int removed = 0;
+            for (var iterator = options.iterator(); iterator.hasNext();) {
+                if (iterator.next().candidate().target().equals(target)) {
+                    iterator.remove();
+                    removed++;
+                }
+            }
+            if (removed > 0) {
+                rejected += removed;
+                failures.merge(reason, removed, Integer::sum);
+            }
+        }
+        private String failureSummary() {
+            String reasons = failures.isEmpty() ? "none" : failures.entrySet().stream()
+                    .map(entry -> entry.getKey() + ":" + entry.getValue()).collect(java.util.stream.Collectors.joining("|"));
+            return "submitted:" + probesSubmitted + ",reasons:" + reasons + ",cooldownAudit{" + cooldownAudit + "}";
+        }
+    }
     public record Metrics(long planningAttempts, long candidateWarzones, long pathProbes, long campaignsStarted, long campaignsCompleted, long campaignsFailed, long pauses) { }
 }

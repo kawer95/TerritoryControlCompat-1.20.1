@@ -5,7 +5,7 @@ plugins {
 }
 
 group = 'com.arxyt'
-version = '0.8.0'
+version = '0.8.2'
 
 base { archivesName = 'territorycontrolcompat' }
 
@@ -20,10 +20,12 @@ repositories { mavenCentral() }
 
 dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
-    implementation fg.deobf(files('../TerritoryControl-1.20.1/build/libs/territorycontrol-0.10.25.jar'))
+    implementation fg.deobf(files('../TerritoryControl-1.20.1/build/libs/territorycontrol-0.10.27.jar'))
     // Rat Warlords' release JAR is reobfuscated. Compile against its official-mapping class output
     // so calls through the public faction API remain valid in this ForgeGradle userdev workspace.
-    implementation files('../RatNations-1.20.1/build/classes/java/main')
+    compileOnly files('../RatNations-1.20.1/build/classes/java/main')
+    testImplementation files('../RatNations-1.20.1/build/classes/java/main')
+    testRuntimeOnly files('../RatNations-1.20.1/build/classes/java/main')
     // The natural-refresh bridge invokes the public Rat Nations entity configuration methods.
     // These jars support compilation and the dependency-free verification process; they are not
     // bundled into the compat artifact because Forge loads the actual mods at runtime.
@@ -69,7 +71,25 @@ tasks.register('verifyRatNationsNaturalRefresh', JavaExec) {
     mainClass = 'com.arxyt.territorycontrolcompat.compat.RatNationsNaturalRefreshVerification'
 }
 
+tasks.register('verifyCampaignStrategicPlanner', JavaExec) {
+    group = 'verification'
+    description = 'Runs pure strategic staging, rear-area and deterministic selection checks.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.arxyt.territorycontrolcompat.compat.CampaignStrategicPlannerVerification'
+}
+
+tasks.register('verifyOptionalRatNationsIsolation', JavaExec) {
+    group = 'verification'
+    description = 'Verifies that the always-loaded compat path has no Rat Nations class references.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.arxyt.territorycontrolcompat.OptionalRatNationsIsolationVerification'
+}
+
 tasks.named('check').configure {
     dependsOn tasks.named('verifySporeCompat')
     dependsOn tasks.named('verifyRatNationsNaturalRefresh')
+    dependsOn tasks.named('verifyCampaignStrategicPlanner')
+    dependsOn tasks.named('verifyOptionalRatNationsIsolation')
 }

@@ -16,6 +16,18 @@ public final class SporeCampaignCommands {
                             var lines = SporeCampaignDirector.status(context.getSource().getLevel());
                             if (lines.isEmpty()) context.getSource().sendSuccess(() -> Component.literal("当前维度没有真菌战役。"), false);
                             else lines.forEach(line -> context.getSource().sendSuccess(() -> Component.literal(line), false));
+                            var planner = CampaignPlanningService.metrics();
+                            var snapshots = CampaignWorldSnapshotCache.metrics(context.getSource().getLevel());
+                            context.getSource().sendSuccess(() -> Component.literal("async running=" + planner.running()
+                                    + " queued=" + planner.queued() + " complete=" + planner.completed()
+                                    + " cancelled=" + planner.cancelled() + " expired=" + planner.expired()
+                                    + " rejected=" + planner.rejected() + " probes=" + CampaignRouteProbeService.activeCount()
+                                    + " probeQueue=" + CampaignRouteProbeService.pendingCount()
+                                    + " deployments=" + CampaignDeploymentService.pending(context.getSource().getLevel())), false);
+                            context.getSource().sendSuccess(() -> Component.literal("snapshots tiles=" + snapshots.pendingTiles()
+                                    + " terrainBacklog=" + snapshots.terrainBacklog() + " terrain=" + snapshots.terrainChunks()
+                                    + " territories=" + snapshots.territoryChunks() + " maxMainNanos=" + snapshots.maxTickNanos()
+                                    + " failureQueue=" + CampaignFailureLog.queued() + " failureDropped=" + CampaignFailureLog.dropped()), false);
                             return lines.size();
                         }))
                         .then(Commands.literal("abort")

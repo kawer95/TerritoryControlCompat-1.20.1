@@ -60,6 +60,13 @@ ordering="AFTER"
 side="BOTH"
 
 [[dependencies.territorycontrolcompat]]
+modId="dominionsword"
+mandatory=false
+versionRange="[0,)"
+ordering="AFTER"
+side="BOTH"
+
+[[dependencies.territorycontrolcompat]]
 modId="minecraft"
 mandatory=true
 versionRange="[1.20.1,1.21)"
@@ -69,6 +76,6 @@ side="BOTH"
 [[dependencies.territorycontrolcompat]]
 modId="territorycontrol"
 mandatory=true
-versionRange="[0.10.16,)"
+    versionRange="[0.10.27,)"
 ordering="AFTER"
 side="BOTH"

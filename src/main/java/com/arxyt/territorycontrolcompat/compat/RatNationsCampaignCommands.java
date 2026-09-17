@@ -26,6 +26,18 @@ public final class RatNationsCampaignCommands {
                                     + " zones=" + metrics.candidateWarzones() + " paths=" + metrics.pathProbes()
                                     + " start=" + metrics.campaignsStarted() + " win=" + metrics.campaignsCompleted()
                                     + " fail=" + metrics.campaignsFailed() + " pause=" + metrics.pauses()), false);
+                            var planner = CampaignPlanningService.metrics();
+                            var snapshots = CampaignWorldSnapshotCache.metrics(context.getSource().getLevel());
+                            context.getSource().sendSuccess(() -> Component.literal("async running=" + planner.running()
+                                    + " queued=" + planner.queued() + " complete=" + planner.completed()
+                                    + " cancelled=" + planner.cancelled() + " expired=" + planner.expired()
+                                    + " rejected=" + planner.rejected() + " probes=" + CampaignRouteProbeService.activeCount()
+                                    + " probeQueue=" + CampaignRouteProbeService.pendingCount()
+                                    + " deployments=" + CampaignDeploymentService.pending(context.getSource().getLevel())), false);
+                            context.getSource().sendSuccess(() -> Component.literal("snapshots tiles=" + snapshots.pendingTiles()
+                                    + " terrainBacklog=" + snapshots.terrainBacklog() + " terrain=" + snapshots.terrainChunks()
+                                    + " territories=" + snapshots.territoryChunks() + " maxMainNanos=" + snapshots.maxTickNanos()
+                                    + " failureQueue=" + CampaignFailureLog.queued() + " failureDropped=" + CampaignFailureLog.dropped()), false);
                             return lines.size();
                         }))
                         .then(Commands.literal("abort").then(Commands.argument("nation", ResourceLocationArgument.id())

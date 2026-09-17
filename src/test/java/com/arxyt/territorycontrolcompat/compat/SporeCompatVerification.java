@@ -1,6 +1,7 @@
 package com.arxyt.territorycontrolcompat.compat;
 
 import com.arxyt.territorycontrol.api.EntityFactionProvider;
+import com.arxyt.territorycontrol.api.TerritoryControlApi;
 import com.arxyt.territorycontrolcompat.data.CompatSavedData;
 import com.arxyt.territorycontrolcompat.network.CompatConfigPacket;
 import io.netty.buffer.Unpooled;
@@ -50,6 +51,7 @@ public final class SporeCompatVerification {
         verifyCompatConfigPacketRoundTrip();
         verifySporeCampaignPersistence();
         verifyCampaignTerrainPolicy();
+        verifySporeTerrainCleanupProfile();
         verifyBuiltinCnpcFactionCatalog();
         verifyRatNationsFactionCatalog();
     }
@@ -78,6 +80,12 @@ public final class SporeCompatVerification {
     private static void verifySporeCampaignPersistence() {
         require(CampaignTerrainResolver.twoThirds(8) == 6, "eight members require six reachable paths");
         require(CampaignTerrainResolver.twoThirds(12) == 8, "twelve members require eight reachable paths");
+        require(SporeCampaignPolicy.isAvailableInfected(false, false),
+                "a non-combat infected unit with a retained native search waypoint must remain campaign-eligible");
+        require(!SporeCampaignPolicy.isAvailableInfected(true, false),
+                "an infected unit already assigned to a campaign must remain unavailable");
+        require(!SporeCampaignPolicy.isAvailableInfected(false, true),
+                "an infected unit with an active combat target must remain unavailable");
         SporeCampaignSavedData.Key key = new SporeCampaignSavedData.Key("minecraft:overworld", SporeCampaignSavedData.Type.GRAND);
         UUID infectedId = UUID.randomUUID();
         UUID calamityId = UUID.randomUUID();
@@ -112,6 +120,12 @@ public final class SporeCompatVerification {
                 "lava surfaces must never become campaign anchors");
         require(!CampaignTerrainResolver.hasDryColumn(false, false, false, false, true),
                 "submerged objectives must never become campaign anchors");
+    }
+
+    private static void verifySporeTerrainCleanupProfile() {
+        TerritoryControlApi.TerrainCleanupProfile profile = SporeCompat.terrainCleanupProfile();
+        require(profile.sourceModId().equals("spore"),
+                "Spore terrain cleanup must register under the Spore faction mod id");
     }
 
     private static void verifyPrionClassification() {
