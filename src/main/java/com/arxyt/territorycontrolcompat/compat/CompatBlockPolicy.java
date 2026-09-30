@@ -86,7 +86,9 @@ public final class CompatBlockPolicy {
      */
     public static boolean allowStateUpdate(LevelAccessor level, BlockPos pos,
                                            BlockState oldState, BlockState newState) {
-        return SporeCompat.isFungalLifecycleTransition(oldState, newState);
+        return oldState.getBlock() != newState.getBlock()
+                && (policy(oldState.getBlock()) & SPORE_FUNGAL) != 0
+                && (policy(newState.getBlock()) & SPORE_FUNGAL) != 0;
     }
 
     static int policy(Block block) {
